@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Factura de Agua</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Consulta de Factura de Agua</h1>
+    <p>Introduce el número de casa para consultar la factura:</p>
+    
+    <label for="houseNumber">Número de Casa:</label>
+    <input type="number" id="houseNumber" />
+    <button onclick="searchInvoice()">Buscar</button>
+
+    <div id="result"></div>
+
+    <script>
+        let invoices = [];
+
+        // Cargar el archivo Excel del servidor
+        async function loadExcelFile() {
+            try {
+                const response = await fetch('facturas.xlsx'); // Asegúrate de que "facturas.xlsx" esté en el servidor
+                if (!response.ok) {
+                    throw new Error('No se pudo cargar el archivo de facturas.');
+                }
+                const data = await response.arrayBuffer();
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0]; // Leer la primera hoja
+                const sheet = workbook.Sheets[sheetName];
+                invoices = XLSX.utils.sheet_to_json(sheet);
+                console.log('Archivo cargado correctamente:', invoices);
+            } catch (error) {
+                console.error('Error al cargar el archivo:', error);
+                document.getElementById('result').textContent = 'Error al cargar el archivo de facturas.';
+            }
+        }
+
+        // Formatear número como moneda en pesos chilenos
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+        }
+
+        // Formatear cualquier número a dos decimales
+        function formatNumber(value) {
+            return Number(value).toFixed(2);
+        }
+
+        // Buscar la factura por número de casa
+        function searchInvoice() {
+            const houseNumber = document.getElementById('houseNumber').value;
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = ''; // Limpiar resultados previos
+
+            if (!houseNumber) {
+                resultDiv.textContent = 'Por favor, introduce un número de casa.';
+                return;
+            }
+
+            const invoice = invoices.find(row => row['CASA'] == houseNumber);
+
+            if (invoice) {
+                let html = `
+                    <h2>Factura para la Casa ${houseNumber}</h2>
+                    <table>
+                        <tr><th>Campo</th><th>Valor</th></tr>
+                `;
+
+                // Lista de campos a formatear como CLP
+                const currencyFields = [
+                    'VALOR DE M3',
+                    'SUBTOTAL A PAGAR',
+                    'CONSUMO GENERAL',
+                    'GASTO COMUN',
+                    'TOTAL A PAGAR'
+                ];
+
+                Object.keys(invoice).forEach(key => {
+                    const value = invoice[key];
+                    let formattedValue;
+
+                    if (currencyFields.includes(key) && typeof value === 'number') {
+                        // Formatear como moneda
+                        formattedValue = formatCurrency(value.toFixed(2));
+                    } else if (typeof value === 'number') {
+                        // Formatear como número con dos decimales
+                        formattedValue = formatNumber(value);
+                    } else {
+                        // No formatear cadenas u otros datos
+                        formattedValue = value;
+                    }
+
+                    html += `<tr><td>${key}</td><td>${formattedValue}</td></tr>`;
+                });
+                html += `</table>`;
+                resultDiv.innerHTML = html;
+            } else {
+                resultDiv.textContent = `No se encontró información para la casa ${houseNumber}.`;
+            }
+        }
+
+        // Cargar datos al inicio
+        loadExcelFile();
+    </script>
+</body>
+</html>
