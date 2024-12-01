@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Factura de Agua</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Consulta de Factura de Agua</h1>
+    <p>Selecciona el mes y año de la factura, e introduce el número de casa:</p>
+    
+    <label for="monthSelector">Mes y Año:</label>
+    <select id="monthSelector" onchange="loadSelectedMonth()">
+        <option value="">Seleccionar...</option>
+        <option value="facturas_2024_10.xlsx">Octubre 2024</option>
+        <option value="facturas_2024_11.xlsx">Noviembre 2024</option>
+    </select>
+
+    <br><br>
+
+    <label for="houseNumber">Número de Casa:</label>
+    <input type="number" id="houseNumber" />
+    <button onclick="searchInvoice()">Buscar</button>
+
+    <div id="result"></div>
+
+    <script>
+        let invoices = [];
+        let selectedMonthFile = '';
+
+        async function loadSelectedMonth() {
+            const selector = document.getElementById('monthSelector');
+            selectedMonthFile = selector.value;
+
+            if (!selectedMonthFile) {
+                document.getElementById('result').textContent = 'Por favor, selecciona un mes.';
+                invoices = [];
+                return;
+            }
+
+            try {
+                const response = await fetch(selectedMonthFile);
+                if (!response.ok) throw new Error('No se pudo cargar el archivo de facturas.');
+                const data = await response.arrayBuffer();
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                invoices = XLSX.utils.sheet_to_json(sheet);
+                console.log('Archivo cargado:', invoices);
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('result').textContent = 'Error al cargar el archivo de facturas.';
+                invoices = [];
+            }
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+        }
+
+        function parseNumber(value) {
+            // Convertir valores numéricos o en formato de moneda a números reales
+            if (typeof value === 'string') {
+                return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
+            }
+            return parseFloat(value) || 0;
+        }
+
+        function searchInvoice() {
+            const houseNumber = document.getElementById('houseNumber').value;
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';
+
+            if (!houseNumber || !selectedMonthFile) {
+                resultDiv.textContent = 'Por favor, selecciona un mes y un número de casa.';
+                return;
+            }
+
+            const invoice = invoices.find(row => row['CASA'] == houseNumber);
+
+            if (invoice) {
+                // Convertir valores relevantes a números y calcular el total
+                const subtotal = parseNumber(invoice['SUBTOTAL'] || invoice['SUBTOTAL A PAGAR']);
+                const consumoGeneral = parseNumber(invoice['CONSUMO GENERAL']);
+                const gastoComun = parseNumber(invoice['GASTO COMUN']);
+                const totalConSumas = subtotal + consumoGeneral + gastoComun;
+
+                // Mostrar factura recalculada
+                let html = `
+                    <h2>Factura para la Casa ${houseNumber}</h2>
+                    <table>
+                        <tr><th>Campo</th><th>Valor</th></tr>
+                        <tr><td>CASA</td><td>${invoice['CASA']}</td></tr>
+                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
+                        <tr><td>N° REMARCADOR</td><td>${invoice['N° REMARCADOR']}</td></tr>
+                        <tr><td>LECTURA ANTERIOR</td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
+                        <tr><td>LECTURA ACTUAL</td><td>${invoice['LECTURA ACTUAL']}</td></tr>
+                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
+                        <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
+                        <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
+                        <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
+                        <tr><td>GASTO COMUN</td><td>${formatCurrency(gastoComun)}</td></tr>
+                        <tr><td>TOTAL A PAGAR</td><td>${formatCurrency(totalConSumas)}</td></tr>
+                    </table>
+                `;
+                resultDiv.innerHTML = html;
+            } else {
+                resultDiv.textContent = `No se encontró información para la casa ${houseNumber}.`;
+            }
+        }
+    </script>
+</body>
+</html>
