@@ -73,31 +73,24 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
-                invoices = XLSX.utils.sheet_to_json(sheet).map(normalizeRow).map(validateRow);
-                console.log('Datos cargados y validados:', invoices);
-                document.getElementById('result').textContent = 'Archivo cargado correctamente.';
+                const rawData = XLSX.utils.sheet_to_json(sheet);
+
+                // Normalizar encabezados
+                invoices = rawData.map(row => {
+                    const normalizedRow = {};
+                    for (const key in row) {
+                        const normalizedKey = key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+                        normalizedRow[normalizedKey] = row[key];
+                    }
+                    return normalizedRow;
+                });
+
+                console.log('Datos cargados:', invoices);
             } catch (error) {
                 console.error('Error:', error);
                 document.getElementById('result').textContent = 'Error al cargar el archivo de facturas.';
                 invoices = [];
             }
-        }
-
-        function normalizeRow(row) {
-            const normalizedRow = {};
-            for (const key in row) {
-                const normalizedKey = key.trim().toUpperCase().replace(/ /g, '_');
-                normalizedRow[normalizedKey] = row[key];
-            }
-            return normalizedRow;
-        }
-
-        function validateRow(row) {
-            return {
-                ...row,
-                LECTURA_ANTERIOR: row.LECTURA_ANTERIOR || 'Sin dato',
-                CONSUMO_GENERAL: row.CONSUMO_GENERAL || 0,
-            };
         }
 
         function formatCurrency(value) {
@@ -124,22 +117,24 @@
             const invoice = invoices.find(row => row['CASA'] == houseNumber);
 
             if (invoice) {
-                const subtotal = parseNumber(invoice['SUBTOTAL']);
+                const lecturaAnterior = parseNumber(invoice['LECTURA_ANTERIOR']);
+                const lecturaActual = parseNumber(invoice['LECTURA_ACTUAL']);
                 const consumoGeneral = parseNumber(invoice['CONSUMO_GENERAL']);
                 const gastoComun = parseNumber(invoice['GASTO_COMUN']);
+                const subtotal = parseNumber(invoice['SUBTOTAL']);
                 const totalConSumas = subtotal + consumoGeneral + gastoComun;
 
-                let html = `
+                const html = `
                     <h2>Factura para la Casa ${houseNumber}</h2>
                     <table>
                         <tr><th>Campo</th><th>Valor</th></tr>
                         <tr><td>CASA</td><td>${invoice['CASA']}</td></tr>
                         <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['TITULAR']}</td></tr>
                         <tr><td>N° REMARCADOR</td><td>${invoice['REMARCADOR']}</td></tr>
-                        <tr><td>LECTURA ANTERIOR</td><td>${invoice['LECTURA_ANTERIOR']}</td></tr>
-                        <tr><td>LECTURA ACTUAL</td><td>${invoice['LECTURA_ACTUAL']}</td></tr>
-                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice['CONSUMO_M3']}</td></tr>
-                        <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice['VALOR_M3'])}</td></tr>
+                        <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior}</td></tr>
+                        <tr><td>LECTURA ACTUAL</td><td>${lecturaActual}</td></tr>
+                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice['CONSUMO_DE_AGUA_M3']}</td></tr>
+                        <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice['VALOR_DE_M3'])}</td></tr>
                         <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
                         <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
                         <tr><td>GASTO COMUN</td><td>${formatCurrency(gastoComun)}</td></tr>
