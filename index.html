@@ -24,12 +24,12 @@
         table, th, td {
             border: 1px solid #ddd;
         }
+        th {
+            background-color: #f4f4f4;
+        }
         th, td {
             padding: 8px;
             text-align: left;
-        }
-        th {
-            background-color: #f4f4f4;
         }
     </style>
 </head>
@@ -73,22 +73,10 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
-                invoices = XLSX.utils.sheet_to_json(sheet);
+                invoices = XLSX.utils.sheet_to_json(sheet).map(normalizeRow);
 
-                // Normalizar columnas
-                invoices = invoices.map(row => ({
-                    CASA: row['CASA'] || row['Casa'],
-                    TITULAR: row['NOMBRE DEL TITULAR DE LA VIVIENDA'] || row['Titular'],
-                    REMARCADOR: row['N° REMARCADOR'] || row['Remarcador'],
-                    LECTURA_ANTERIOR: parseNumber(row['LECTURA ANTERIOR']),
-                    LECTURA_ACTUAL: parseNumber(row['LECTURA ACTUAL']),
-                    CONSUMO_M3: parseNumber(row['CONSUMO DE AGUA M3']),
-                    VALOR_M3: parseNumber(row['VALOR DE M3']),
-                    SUBTOTAL: parseNumber(row['SUBTOTAL']),
-                    CONSUMO_GENERAL: parseNumber(row['CONSUMO GENERAL']),
-                    GASTO_COMUN: parseNumber(row['GASTO COMUN']),
-                }));
-                console.log('Archivo cargado:', invoices);
+                console.log('Datos cargados:', invoices);
+                document.getElementById('result').textContent = 'Archivo cargado correctamente.';
             } catch (error) {
                 console.error('Error:', error);
                 document.getElementById('result').textContent = 'Error al cargar el archivo de facturas.';
@@ -96,8 +84,19 @@
             }
         }
 
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+        function normalizeRow(row) {
+            return {
+                CASA: row['CASA'] || row['Casa'] || '',
+                TITULAR: row['NOMBRE DEL TITULAR DE LA VIVIENDA'] || row['Titular'] || 'No disponible',
+                REMARCADOR: row['N° REMARCADOR'] || row['Remarcador'] || 'No disponible',
+                LECTURA_ANTERIOR: parseNumber(row['LECTURA ANTERIOR'] || row['Lectura anterior']),
+                LECTURA_ACTUAL: parseNumber(row['LECTURA ACTUAL'] || row['Lectura actual']),
+                CONSUMO_M3: parseNumber(row['CONSUMO DE AGUA M3'] || row['Consumo de agua']),
+                VALOR_M3: parseNumber(row['VALOR DE M3']),
+                SUBTOTAL: parseNumber(row['SUBTOTAL']),
+                CONSUMO_GENERAL: parseNumber(row['CONSUMO GENERAL'] || row['Consumo general']),
+                GASTO_COMUN: parseNumber(row['GASTO COMUN'] || row['Gasto común']),
+            };
         }
 
         function parseNumber(value) {
@@ -105,6 +104,10 @@
                 return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
             }
             return parseFloat(value) || 0;
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
         }
 
         function searchInvoice() {
@@ -120,12 +123,9 @@
             const invoice = invoices.find(row => row.CASA == houseNumber);
 
             if (invoice) {
-                const subtotal = invoice.SUBTOTAL;
-                const consumoGeneral = invoice.CONSUMO_GENERAL;
-                const gastoComun = invoice.GASTO_COMUN;
-                const total = subtotal + consumoGeneral + gastoComun;
+                const total = (invoice.SUBTOTAL || 0) + (invoice.CONSUMO_GENERAL || 0) + (invoice.GASTO_COMUN || 0);
 
-                let html = `
+                const html = `
                     <h2>Factura para la Casa ${houseNumber}</h2>
                     <table>
                         <tr><th>Campo</th><th>Valor</th></tr>
@@ -136,9 +136,9 @@
                         <tr><td>LECTURA ACTUAL</td><td>${invoice.LECTURA_ACTUAL}</td></tr>
                         <tr><td>CONSUMO DE AGUA M3</td><td>${invoice.CONSUMO_M3}</td></tr>
                         <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice.VALOR_M3)}</td></tr>
-                        <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
-                        <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
-                        <tr><td>GASTO COMUN</td><td>${formatCurrency(gastoComun)}</td></tr>
+                        <tr><td>SUBTOTAL</td><td>${formatCurrency(invoice.SUBTOTAL)}</td></tr>
+                        <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(invoice.CONSUMO_GENERAL)}</td></tr>
+                        <tr><td>GASTO COMUN</td><td>${formatCurrency(invoice.GASTO_COMUN)}</td></tr>
                         <tr><td>TOTAL A PAGAR</td><td>${formatCurrency(total)}</td></tr>
                     </table>
                 `;
