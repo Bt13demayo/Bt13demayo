@@ -74,6 +74,20 @@
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
                 invoices = XLSX.utils.sheet_to_json(sheet);
+
+                // Normalizar columnas
+                invoices = invoices.map(row => ({
+                    CASA: row['CASA'] || row['Casa'],
+                    TITULAR: row['NOMBRE DEL TITULAR DE LA VIVIENDA'] || row['Titular'],
+                    REMARCADOR: row['N° REMARCADOR'] || row['Remarcador'],
+                    LECTURA_ANTERIOR: parseNumber(row['LECTURA ANTERIOR']),
+                    LECTURA_ACTUAL: parseNumber(row['LECTURA ACTUAL']),
+                    CONSUMO_M3: parseNumber(row['CONSUMO DE AGUA M3']),
+                    VALOR_M3: parseNumber(row['VALOR DE M3']),
+                    SUBTOTAL: parseNumber(row['SUBTOTAL']),
+                    CONSUMO_GENERAL: parseNumber(row['CONSUMO GENERAL']),
+                    GASTO_COMUN: parseNumber(row['GASTO COMUN']),
+                }));
                 console.log('Archivo cargado:', invoices);
             } catch (error) {
                 console.error('Error:', error);
@@ -87,7 +101,6 @@
         }
 
         function parseNumber(value) {
-            // Convertir valores numéricos o en formato de moneda a números reales
             if (typeof value === 'string') {
                 return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
             }
@@ -104,31 +117,29 @@
                 return;
             }
 
-            const invoice = invoices.find(row => row['CASA'] == houseNumber);
+            const invoice = invoices.find(row => row.CASA == houseNumber);
 
             if (invoice) {
-                // Convertir valores relevantes a números y calcular el total
-                const subtotal = parseNumber(invoice['SUBTOTAL'] || invoice['SUBTOTAL A PAGAR']);
-                const consumoGeneral = parseNumber(invoice['CONSUMO GENERAL']);
-                const gastoComun = parseNumber(invoice['GASTO COMUN']);
-                const totalConSumas = subtotal + consumoGeneral + gastoComun;
+                const subtotal = invoice.SUBTOTAL;
+                const consumoGeneral = invoice.CONSUMO_GENERAL;
+                const gastoComun = invoice.GASTO_COMUN;
+                const total = subtotal + consumoGeneral + gastoComun;
 
-                // Mostrar factura recalculada
                 let html = `
                     <h2>Factura para la Casa ${houseNumber}</h2>
                     <table>
                         <tr><th>Campo</th><th>Valor</th></tr>
-                        <tr><td>CASA</td><td>${invoice['CASA']}</td></tr>
-                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
-                        <tr><td>N° REMARCADOR</td><td>${invoice['N° REMARCADOR']}</td></tr>
-                        <tr><td>LECTURA ANTERIOR</td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
-                        <tr><td>LECTURA ACTUAL</td><td>${invoice['LECTURA ACTUAL']}</td></tr>
-                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
-                        <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
+                        <tr><td>CASA</td><td>${invoice.CASA}</td></tr>
+                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice.TITULAR}</td></tr>
+                        <tr><td>N° REMARCADOR</td><td>${invoice.REMARCADOR}</td></tr>
+                        <tr><td>LECTURA ANTERIOR</td><td>${invoice.LECTURA_ANTERIOR}</td></tr>
+                        <tr><td>LECTURA ACTUAL</td><td>${invoice.LECTURA_ACTUAL}</td></tr>
+                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice.CONSUMO_M3}</td></tr>
+                        <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice.VALOR_M3)}</td></tr>
                         <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
                         <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
                         <tr><td>GASTO COMUN</td><td>${formatCurrency(gastoComun)}</td></tr>
-                        <tr><td>TOTAL A PAGAR</td><td>${formatCurrency(totalConSumas)}</td></tr>
+                        <tr><td>TOTAL A PAGAR</td><td>${formatCurrency(total)}</td></tr>
                     </table>
                 `;
                 resultDiv.innerHTML = html;
