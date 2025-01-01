@@ -73,17 +73,7 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
-                const rawData = XLSX.utils.sheet_to_json(sheet);
-
-                // Normalizar encabezados
-                invoices = rawData.map(row => {
-                    const normalizedRow = {};
-                    for (const key in row) {
-                        const normalizedKey = key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-                        normalizedRow[normalizedKey] = row[key] || "No disponible";
-                    }
-                    return normalizedRow;
-                });
+                invoices = XLSX.utils.sheet_to_json(sheet);
 
                 console.log('Datos cargados:', invoices);
             } catch (error) {
@@ -94,61 +84,9 @@
         }
 
         function formatCurrency(value) {
-            if (!value || isNaN(value)) return '$0';
-            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value || 0);
         }
 
         function parseNumber(value) {
             if (typeof value === 'string') {
-                return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
-            }
-            return parseFloat(value) || 0;
-        }
-
-        function searchInvoice() {
-            const houseNumber = document.getElementById('houseNumber').value;
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = '';
-
-            if (!houseNumber || !selectedMonthFile) {
-                resultDiv.textContent = 'Por favor, selecciona un mes y un número de casa.';
-                return;
-            }
-
-            const invoice = invoices.find(row => row['CASA'] == houseNumber);
-
-            if (invoice) {
-                const lecturaAnterior = parseNumber(invoice['LECTURA_ANTERIOR']);
-                const lecturaActual = parseNumber(invoice['LECTURA_ACTUAL']);
-                const consumoDeAguaM3 = parseNumber(invoice['CONSUMO_DE_AGUA_M3']);
-                const valorDeM3 = parseNumber(invoice['VALOR_DE_M3']);
-                const subtotal = parseNumber(invoice['SUBTOTAL']);
-                const consumoGeneral = parseNumber(invoice['CONSUMO_GENERAL']);
-                const gastoComun = parseNumber(invoice['GASTO_COMUN']);
-                const totalConSumas = subtotal + consumoGeneral + gastoComun;
-
-                const html = `
-                    <h2>Factura para la Casa ${houseNumber}</h2>
-                    <table>
-                        <tr><th>Campo</th><th>Valor</th></tr>
-                        <tr><td>CASA</td><td>${invoice['CASA'] || "No disponible"}</td></tr>
-                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['NOMBRE_DEL_TITULAR_DE_LA_VIVIENDA'] || "No disponible"}</td></tr>
-                        <tr><td>N° REMARCADOR</td><td>${invoice['N°_REMARCADOR'] || "No disponible"}</td></tr>
-                        <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior}</td></tr>
-                        <tr><td>LECTURA ACTUAL</td><td>${lecturaActual}</td></tr>
-                        <tr><td>CONSUMO DE AGUA M3</td><td>${consumoDeAguaM3}</td></tr>
-                        <tr><td>VALOR DE M3</td><td>${formatCurrency(valorDeM3)}</td></tr>
-                        <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
-                        <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
-                        <tr><td>GASTO COMUN</td><td>${formatCurrency(gastoComun)}</td></tr>
-                        <tr><td>TOTAL A PAGAR</td><td>${formatCurrency(totalConSumas)}</td></tr>
-                    </table>
-                `;
-                resultDiv.innerHTML = html;
-            } else {
-                resultDiv.textContent = `No se encontró información para la casa ${houseNumber}.`;
-            }
-        }
-    </script>
-</body>
-</html>
+                return parseFloat(value.replace(/[^0-9.-]+/g, '')) ||
