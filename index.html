@@ -120,9 +120,11 @@
             if (invoice) {
                 const lecturaAnterior = parseNumber(invoice['LECTURA_ANTERIOR']);
                 const lecturaActual = parseNumber(invoice['LECTURA_ACTUAL']);
+                const consumoDeAguaM3 = parseNumber(invoice['CONSUMO_DE_AGUA_M3']);
+                const valorDeM3 = parseNumber(invoice['VALOR_DE_M3']);
+                const subtotal = parseNumber(invoice['SUBTOTAL']);
                 const consumoGeneral = parseNumber(invoice['CONSUMO_GENERAL']);
                 const gastoComun = parseNumber(invoice['GASTO_COMUN']);
-                const subtotal = parseNumber(invoice['SUBTOTAL']);
                 const totalConSumas = subtotal + consumoGeneral + gastoComun;
 
                 const html = `
@@ -130,12 +132,12 @@
                     <table>
                         <tr><th>Campo</th><th>Valor</th></tr>
                         <tr><td>CASA</td><td>${invoice['CASA'] || "No disponible"}</td></tr>
-                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['TITULAR'] || "No disponible"}</td></tr>
-                        <tr><td>N° REMARCADOR</td><td>${invoice['REMARCADOR'] || "No disponible"}</td></tr>
+                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['NOMBRE_DEL_TITULAR_DE_LA_VIVIENDA'] || "No disponible"}</td></tr>
+                        <tr><td>N° REMARCADOR</td><td>${invoice['N°_REMARCADOR'] || "No disponible"}</td></tr>
                         <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior}</td></tr>
                         <tr><td>LECTURA ACTUAL</td><td>${lecturaActual}</td></tr>
-                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice['CONSUMO_DE_AGUA_M3'] || "No disponible"}</td></tr>
-                        <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice['VALOR_DE_M3'])}</td></tr>
+                        <tr><td>CONSUMO DE AGUA M3</td><td>${consumoDeAguaM3}</td></tr>
+                        <tr><td>VALOR DE M3</td><td>${formatCurrency(valorDeM3)}</td></tr>
                         <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
                         <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
                         <tr><td>GASTO COMUN</td><td>${formatCurrency(gastoComun)}</td></tr>
