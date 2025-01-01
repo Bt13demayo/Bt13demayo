@@ -24,12 +24,12 @@
         table, th, td {
             border: 1px solid #ddd;
         }
-        th {
-            background-color: #f4f4f4;
-        }
         th, td {
             padding: 8px;
             text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
         }
     </style>
 </head>
@@ -73,9 +73,8 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
-                invoices = XLSX.utils.sheet_to_json(sheet).map(normalizeRow);
-
-                console.log('Datos cargados:', invoices);
+                invoices = XLSX.utils.sheet_to_json(sheet).map(normalizeRow).map(validateRow);
+                console.log('Datos cargados y validados:', invoices);
                 document.getElementById('result').textContent = 'Archivo cargado correctamente.';
             } catch (error) {
                 console.error('Error:', error);
@@ -85,18 +84,24 @@
         }
 
         function normalizeRow(row) {
+            const normalizedRow = {};
+            for (const key in row) {
+                const normalizedKey = key.trim().toUpperCase().replace(/ /g, '_');
+                normalizedRow[normalizedKey] = row[key];
+            }
+            return normalizedRow;
+        }
+
+        function validateRow(row) {
             return {
-                CASA: row['CASA'] || row['Casa'] || '',
-                TITULAR: row['NOMBRE DEL TITULAR DE LA VIVIENDA'] || row['Titular'] || 'No disponible',
-                REMARCADOR: row['N° REMARCADOR'] || row['Remarcador'] || 'No disponible',
-                LECTURA_ANTERIOR: parseNumber(row['LECTURA ANTERIOR'] || row['Lectura anterior']),
-                LECTURA_ACTUAL: parseNumber(row['LECTURA ACTUAL'] || row['Lectura actual']),
-                CONSUMO_M3: parseNumber(row['CONSUMO DE AGUA M3'] || row['Consumo de agua']),
-                VALOR_M3: parseNumber(row['VALOR DE M3']),
-                SUBTOTAL: parseNumber(row['SUBTOTAL']),
-                CONSUMO_GENERAL: parseNumber(row['CONSUMO GENERAL'] || row['Consumo general']),
-                GASTO_COMUN: parseNumber(row['GASTO COMUN'] || row['Gasto común']),
+                ...row,
+                LECTURA_ANTERIOR: row.LECTURA_ANTERIOR || 'Sin dato',
+                CONSUMO_GENERAL: row.CONSUMO_GENERAL || 0,
             };
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
         }
 
         function parseNumber(value) {
@@ -104,10 +109,6 @@
                 return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
             }
             return parseFloat(value) || 0;
-        }
-
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
         }
 
         function searchInvoice() {
@@ -120,26 +121,29 @@
                 return;
             }
 
-            const invoice = invoices.find(row => row.CASA == houseNumber);
+            const invoice = invoices.find(row => row['CASA'] == houseNumber);
 
             if (invoice) {
-                const total = (invoice.SUBTOTAL || 0) + (invoice.CONSUMO_GENERAL || 0) + (invoice.GASTO_COMUN || 0);
+                const subtotal = parseNumber(invoice['SUBTOTAL']);
+                const consumoGeneral = parseNumber(invoice['CONSUMO_GENERAL']);
+                const gastoComun = parseNumber(invoice['GASTO_COMUN']);
+                const totalConSumas = subtotal + consumoGeneral + gastoComun;
 
-                const html = `
+                let html = `
                     <h2>Factura para la Casa ${houseNumber}</h2>
                     <table>
                         <tr><th>Campo</th><th>Valor</th></tr>
-                        <tr><td>CASA</td><td>${invoice.CASA}</td></tr>
-                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice.TITULAR}</td></tr>
-                        <tr><td>N° REMARCADOR</td><td>${invoice.REMARCADOR}</td></tr>
-                        <tr><td>LECTURA ANTERIOR</td><td>${invoice.LECTURA_ANTERIOR}</td></tr>
-                        <tr><td>LECTURA ACTUAL</td><td>${invoice.LECTURA_ACTUAL}</td></tr>
-                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice.CONSUMO_M3}</td></tr>
-                        <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice.VALOR_M3)}</td></tr>
-                        <tr><td>SUBTOTAL</td><td>${formatCurrency(invoice.SUBTOTAL)}</td></tr>
-                        <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(invoice.CONSUMO_GENERAL)}</td></tr>
-                        <tr><td>GASTO COMUN</td><td>${formatCurrency(invoice.GASTO_COMUN)}</td></tr>
-                        <tr><td>TOTAL A PAGAR</td><td>${formatCurrency(total)}</td></tr>
+                        <tr><td>CASA</td><td>${invoice['CASA']}</td></tr>
+                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['TITULAR']}</td></tr>
+                        <tr><td>N° REMARCADOR</td><td>${invoice['REMARCADOR']}</td></tr>
+                        <tr><td>LECTURA ANTERIOR</td><td>${invoice['LECTURA_ANTERIOR']}</td></tr>
+                        <tr><td>LECTURA ACTUAL</td><td>${invoice['LECTURA_ACTUAL']}</td></tr>
+                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice['CONSUMO_M3']}</td></tr>
+                        <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice['VALOR_M3'])}</td></tr>
+                        <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
+                        <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
+                        <tr><td>GASTO COMUN</td><td>${formatCurrency(gastoComun)}</td></tr>
+                        <tr><td>TOTAL A PAGAR</td><td>${formatCurrency(totalConSumas)}</td></tr>
                     </table>
                 `;
                 resultDiv.innerHTML = html;
