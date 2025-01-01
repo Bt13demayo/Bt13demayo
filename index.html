@@ -80,7 +80,7 @@
                     const normalizedRow = {};
                     for (const key in row) {
                         const normalizedKey = key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-                        normalizedRow[normalizedKey] = row[key];
+                        normalizedRow[normalizedKey] = row[key] || "No disponible";
                     }
                     return normalizedRow;
                 });
@@ -94,6 +94,7 @@
         }
 
         function formatCurrency(value) {
+            if (!value || isNaN(value)) return '$0';
             return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
         }
 
@@ -128,12 +129,12 @@
                     <h2>Factura para la Casa ${houseNumber}</h2>
                     <table>
                         <tr><th>Campo</th><th>Valor</th></tr>
-                        <tr><td>CASA</td><td>${invoice['CASA']}</td></tr>
-                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['TITULAR']}</td></tr>
-                        <tr><td>N° REMARCADOR</td><td>${invoice['REMARCADOR']}</td></tr>
+                        <tr><td>CASA</td><td>${invoice['CASA'] || "No disponible"}</td></tr>
+                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['TITULAR'] || "No disponible"}</td></tr>
+                        <tr><td>N° REMARCADOR</td><td>${invoice['REMARCADOR'] || "No disponible"}</td></tr>
                         <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior}</td></tr>
                         <tr><td>LECTURA ACTUAL</td><td>${lecturaActual}</td></tr>
-                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice['CONSUMO_DE_AGUA_M3']}</td></tr>
+                        <tr><td>CONSUMO DE AGUA M3</td><td>${invoice['CONSUMO_DE_AGUA_M3'] || "No disponible"}</td></tr>
                         <tr><td>VALOR DE M3</td><td>${formatCurrency(invoice['VALOR_DE_M3'])}</td></tr>
                         <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
                         <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
