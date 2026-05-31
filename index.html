@@ -59,13 +59,13 @@
         let selectedMonthFile = '';
         let tipoOrigen = '';
 
-        // Procesador especializado para CSV generado en español (separado por punto y coma o coma)
+        // Convierte el texto CSV de Google Sheets en una lista de objetos legibles
         function parseSpanishCSV(text) {
             const lines = text.split(/\r?\n/);
             const result = [];
             if (lines.length === 0 || !lines[0]) return result;
             
-            // Detecta si Google Sheets exportó usando ';' o ',' como separador
+            // Detecta automáticamente si el separador es coma o punto y coma
             const separator = lines[0].includes(";") ? ";" : ",";
             const headers = lines[0].split(separator).map(h => h.replace(/["\r]/g, "").trim().toUpperCase());
 
@@ -83,21 +83,33 @@
             return result;
         }
 
-        // Limpiador numérico estricto y adaptativo chileno
+        // CORRECCIÓN CLAVE: Remueve símbolos, espacios ocultos y estandariza los decimales/miles
         function cleanNumber(val) {
             if (val === undefined || val === null || val === "") return 0;
             if (typeof val === 'number') return val;
 
+            // Quita signos de peso ($), espacios en blanco normales y espacios duros de Sheets
             let s = val.toString().replace(/[\$\s\u00A0]/g, '');
             
+            // Caso 1: Tiene puntos de miles y coma decimal (Ej: 63.006,05)
             if (s.includes('.') && s.includes(',')) {
                 s = s.replace(/\./g, '').replace(',', '.');
-            } else if (s.includes(',')) {
-                s = s.replace(/,/g, '.');
-            } else if (s.includes('.')) {
+            } 
+            // Caso 2: Tiene solo comas (Ej: 112,191 o 7,000 interpretado como miles)
+            else if (s.includes(',')) {
+                // Si la coma está seguida por exactamente 3 dígitos, Sheets la exportó como separador de miles
+                let parts = s.split(',');
+                if (parts[parts.length - 1].length === 3) {
+                    s = s.replace(/,/g, ''); // Remover para dejar entero (Ej: 7000)
+                } else {
+                    s = s.replace(/,/g, '.'); // Conservar como punto decimal
+                }
+            } 
+            // Caso 3: Tiene solo puntos (Ej: 7.000 como formato chileno de miles)
+            else if (s.includes('.')) {
                 let parts = s.split('.');
                 if (parts[parts.length - 1].length === 3) {
-                    s = s.replace(/\./g, '');
+                    s = s.replace(/\./g, ''); // Remover para que "7.000" sea un "7000" puro
                 }
             }
             
@@ -123,12 +135,10 @@
                 const response = await fetch(selectedMonthFile);
                 if (!response.ok) throw new Error();
 
-                // CORRECCIÓN CRÍTICA: Si es origen Google (CSV), leemos como texto plano directamente
                 if (tipoOrigen === 'google') {
                     const csvText = await response.text();
                     invoices = parseSpanishCSV(csvText);
                 } else {
-                    // Si son los archivos locales antiguos (.xlsx), los procesa como binarios
                     const data = await response.arrayBuffer();
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
@@ -145,7 +155,7 @@
                 }
                 document.getElementById('result').textContent = 'Datos listos. Ingresa tu número de casa.';
             } catch (error) {
-                document.getElementById('result').textContent = 'Error al cargar los datos de este mes. Revisa la consola.';
+                document.getElementById('result').textContent = 'Error al cargar los datos del archivo.';
                 invoices = [];
             }
         }
@@ -163,14 +173,14 @@
                 return;
             }
 
-            // Buscamos coincidencia exacta de la casa
-            const invoice = invoices.find(row => row['CASA'] == houseNumber);
+            // Busca el número de casa ignorando ceros a la izquierda
+            const invoice = invoices.find(row => cleanNumber(row['CASA']) == parseInt(houseNumber, 10));
 
             if (invoice) {
                 let lecturaAnterior = cleanNumber(invoice['LECTURA ANTERIOR']);
                 let lecturaActual = cleanNumber(invoice['LECTURA ACTUAL']);
                 
-                // Corrección por si el formato quitó el punto decimal flotante
+                // Corrección automática si la lectura decimal se guardó erróneamente como miles
                 if (lecturaAnterior > 50000) lecturaAnterior = lecturaAnterior / 1000;
                 if (lecturaActual > 50000) lecturaActual = lecturaActual / 1000;
                 
@@ -192,7 +202,7 @@
                     <table>
                         <tr><th>Campo</th><th>Valor</th></tr>
                         <tr><td>ESTADO DE LA FACTURA</td><td><span class="badge ${claseEstado}">${textoEstado}</span></td></tr>
-                        <tr><td>CASA</td><td>${invoice['CASA']}</td></tr>
+                        <tr><td>CASA</td><td>${houseNumber}</td></tr>
                         <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA'] || 'No disponible'}</td></tr>
                         <tr><td>N° REMARCADOR</td><td>${invoice['N° REMARCADOR'] || 'No disponible'}</td></tr>
                         <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior.toFixed(3)}</td></tr>
