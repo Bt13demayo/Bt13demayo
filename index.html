@@ -25,7 +25,7 @@
     <select id="monthSelector" onchange="loadSelectedMonth()">
         <option value="">Seleccionar...</option>
         
-        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv">Abril 2026</option>
+        <option value="https://docs.google.com/spreadsheets/d/1u5BEKYFIN_Uxmd4TXe2g0S3wLtM7a68uIqgoz63H-SQ/edit?gid=1357639760#gid=1357639760" data-tipo="google_excel">Abril 2026 (En vivo)</option>
         
         <option value="facturas_2026_03.xlsx" data-tipo="local">Marzo 2026</option>
         <option value="facturas_2026_02.xlsx" data-tipo="local">Febrero 2026</option>
@@ -59,64 +59,20 @@
         let selectedMonthFile = '';
         let tipoOrigen = '';
 
-        function parseCSV(text) {
-            let p = '', c = '', r = [];
-            let q = false;
-            let row = [''];
-            for (let i=0; i<text.length; i++) {
-                c = text[i];
-                if (c === '"') { q = !q; }
-                else if (c === ',' && !q) { row.push(''); }
-                else if ((c === '\r' || c === '\n') && !q) {
-                    if (c === '\n' && p === '\r') { }
-                    else {
-                        r.push(row);
-                        row = [''];
-                    }
-                } else { row[row.length-1] += c; }
-                p = c;
-            }
-            if (row.length > 1 || row[0] !== '') { r.push(row); }
-            
-            const result = [];
-            if (r.length === 0) return result;
-            const headers = r[0].map(h => h.trim().toUpperCase());
-            
-            for (let i = 1; i < r.length; i++) {
-                const obj = {};
-                for (let j = 0; j < headers.length; j++) {
-                    obj[headers[j]] = r[i][j] ? r[i][j].trim() : "";
-                }
-                result.push(obj);
-            }
-            return result;
-        }
+        // Limpiador numérico estricto y adaptativo
+        function cleanNumber(val) {
+            if (val === undefined || val === null || val === "") return 0;
+            if (typeof val === 'number') return val;
 
-        // Limpiador numérico ultra inteligente y adaptativo para corregir exportaciones de Google Sheets
-        function cleanNumber(val, esValorM3 = false) {
-            if (!val) return 0;
-            // Eliminar signos $, espacios y puntos/comas intermedios raros
             let s = val.toString().replace(/[\$\s\u00A0]/g, '');
-            
-            // Si el texto trae puntos y comas combinados (ej: 63.006,05)
             if (s.includes('.') && s.includes(',')) {
                 s = s.replace(/\./g, '').replace(',', '.');
-            } 
-            // Si viene con formato de comas únicamente
-            else if (s.includes(',')) {
+            } else if (s.includes(',')) {
                 s = s.replace(/,/g, '.');
             }
             
             let num = parseFloat(s);
-            if (isNaN(num)) return 0;
-
-            // CONTROL DE DESFASE REGIONAL DE GOOGLE SHEETS
-            // Si es el valor de M3 y saltó a más de 10000 debido a un punto decimal mal leído (ej: 21.974 en vez de 2197.4)
-            if (esValorM3 && num > 10000) {
-                num = num / 10;
-            }
-            
-            return num;
+            return isNaN(num) ? 0 : num;
         }
 
         async function loadSelectedMonth() {
@@ -131,33 +87,37 @@
                 return;
             }
 
-            document.getElementById('result').textContent = 'Cargando datos del mes...';
+            document.getElementById('result').textContent = 'Conectando con Google Drive...';
 
             try {
-                const response = await fetch(selectedMonthFile);
+                let url = selectedMonthFile;
+                
+                // Hack para transformar tu link de edición directo en un flujo binario descargable
+                if (tipoOrigen === 'google_excel' && url.includes('docs.google.com/spreadsheets')) {
+                    let fileId = url.split('/d/')[1].split('/')[0];
+                    url = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
+                }
+
+                const response = await fetch(url);
                 if (!response.ok) throw new Error();
 
-                if (tipoOrigen === 'google') {
-                    const csvText = await response.text();
-                    invoices = parseCSV(csvText);
-                } else {
-                    const data = await response.arrayBuffer();
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const sheetName = workbook.SheetNames[0];
-                    const sheet = workbook.Sheets[sheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "0" });
+                const data = await response.arrayBuffer();
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "0" });
 
-                    invoices = jsonData.map(row => {
-                        const normalizedRow = {};
-                        for (const key in row) {
-                            normalizedRow[key.trim().toUpperCase()] = row[key];
-                        }
-                        return normalizedRow;
-                    });
-                }
-                document.getElementById('result').textContent = 'Datos listos. Ingresa tu número de casa.';
+                invoices = jsonData.map(row => {
+                    const normalizedRow = {};
+                    for (const key in row) {
+                        normalizedRow[key.trim().toUpperCase()] = row[key];
+                    }
+                    return normalizedRow;
+                });
+
+                document.getElementById('result').textContent = 'Datos en vivo cargados con éxito. Introduce tu número de casa.';
             } catch (error) {
-                document.getElementById('result').textContent = 'Error al cargar los datos de este mes.';
+                document.getElementById('result').textContent = 'Error al leer el archivo en vivo. Asegúrate de que el archivo en Drive esté compartido como "Cualquier persona con el enlace puede ver".';
                 invoices = [];
             }
         }
@@ -178,32 +138,18 @@
             const invoice = invoices.find(row => row['CASA'] == houseNumber);
 
             if (invoice) {
-                // 1. Extraer lecturas base limpias
                 let lecturaAnterior = cleanNumber(invoice['LECTURA ANTERIOR']);
                 let lecturaActual = cleanNumber(invoice['LECTURA ACTUAL']);
                 
-                // Corregir si las lecturas perdieron el separador flotante (ej: 112191 en lugar de 112.191)
                 if (lecturaAnterior > 50000) lecturaAnterior = lecturaAnterior / 1000;
                 if (lecturaActual > 50000) lecturaActual = lecturaActual / 1000;
                 
-                // 2. Calcular consumo real exacto
                 const consumoAgua = lecturaActual - lecturaAnterior;
-                
-                // 3. Obtener el valor del Metro Cúbico aplicando la corrección inteligente de escala
-                const valorM3 = cleanNumber(invoice['VALOR DE M3'], true);
-                
-                // 4. Calcular subtotal matemáticamente puro en la web
+                const valorM3 = cleanNumber(invoice['VALOR DE M3']);
                 const subtotal = consumoAgua * valorM3;
                 
-                // 5. Corregir gastos adicionales si Google Sheets alteró la escala del punto de miles
-                let consumoGeneral = cleanNumber(invoice['CONSUMO GENERAL']);
-                let gastoComun = cleanNumber(invoice['GASTO COMUN']);
-                
-                // Si el gasto común bajó a un dígito por culpa del CSV (ej: 7 en lugar de 7000)
-                if (gastoComun > 0 && gastoComun < 100) gastoComun = gastoComun * 1000;
-                if (consumoGeneral > 0 && consumoGeneral < 100) consumoGeneral = consumoGeneral * 1000;
-                
-                // 6. Sumar todo para obtener el Gran Total exacto en pesos chilenos
+                const consumoGeneral = cleanNumber(invoice['CONSUMO GENERAL']);
+                const gastoComun = cleanNumber(invoice['GASTO COMUN']);
                 const totalPagar = subtotal + consumoGeneral + gastoComun;
                 
                 const estadoExcel = (invoice['ESTADO'] || 'Por pagar').trim().toUpperCase();
@@ -236,7 +182,5 @@
     </script>
 </body>
 </html>
-
-
 
 
