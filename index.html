@@ -25,7 +25,7 @@
     <select id="monthSelector" onchange="loadSelectedMonth()">
         <option value="">Seleccionar...</option>
         
-        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv">Abril 2026 (En vivo)</option>
+        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv" data-tipo="google">Abril 2026 (En vivo)</option>
         
         <option value="facturas_2026_03.xlsx" data-tipo="local">Marzo 2026</option>
         <option value="facturas_2026_02.xlsx" data-tipo="local">Febrero 2026</option>
@@ -59,21 +59,15 @@
         let selectedMonthFile = '';
         let tipoOrigen = '';
 
-        // Función avanzada de parsing que remueve comillas y limpia los encabezados
+        // Convierte el texto CSV de Google Sheets en una lista de objetos legibles
         function parseSpanishCSV(text) {
             const lines = text.split(/\r?\n/);
             const result = [];
             if (lines.length === 0 || !lines[0]) return result;
             
             const separator = lines[0].includes(";") ? ";" : ",";
-            
-            // Limpieza absoluta de encabezados: quitamos comillas, acentos, espacios y forzamos mayúsculas
-            const headers = lines[0].split(separator).map(h => 
-                h.replace(/["\r]/g, "")
-                 .trim()
-                 .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar tildes
-                 .toUpperCase()
-            );
+            // Normalización defensiva: removemos comillas y espacios fantasmas al inicio y final
+            const headers = lines[0].split(separator).map(h => h.replace(/["\r]/g, "").trim().toUpperCase());
 
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i]) continue;
@@ -89,7 +83,7 @@
             return result;
         }
 
-        // Limpiador numérico inmune a formatos de moneda de Google Sheets
+        // Remueve símbolos, espacios ocultos y estandariza los decimales/miles
         function cleanNumber(val) {
             if (val === undefined || val === null || val === "") return 0;
             if (typeof val === 'number') return val;
@@ -98,14 +92,16 @@
             
             if (s.includes('.') && s.includes(',')) {
                 s = s.replace(/\./g, '').replace(',', '.');
-            } else if (s.includes(',')) {
+            } 
+            else if (s.includes(',')) {
                 let parts = s.split(',');
                 if (parts[parts.length - 1].length === 3) {
                     s = s.replace(/,/g, ''); 
                 } else {
                     s = s.replace(/,/g, '.'); 
                 }
-            } else if (s.includes('.')) {
+            } 
+            else if (s.includes('.')) {
                 let parts = s.split('.');
                 if (parts[parts.length - 1].length === 3) {
                     s = s.replace(/\./g, ''); 
@@ -116,11 +112,11 @@
             return isNaN(num) ? 0 : num;
         }
 
-        // Función auxiliar para buscar campos de texto de manera flexible
-        function getProp(obj, keywords) {
+        // FUNCIÓN CLAVE: Busca una propiedad ignorando espacios fantasmas anteriores o posteriores en la clave
+        function getProp(obj, cleanKeyName) {
+            const searchKey = cleanKeyName.trim().toUpperCase();
             for (let key in obj) {
-                let normalizedKey = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-                if (keywords.some(k => normalizedKey.includes(k))) {
+                if (key.trim().toUpperCase() === searchKey) {
                     return obj[key];
                 }
             }
@@ -139,7 +135,7 @@
                 return;
             }
 
-            document.getElementById('result').textContent = 'Sincronizando datos originales...';
+            document.getElementById('result').textContent = 'Cargando datos del mes...';
 
             try {
                 const response = await fetch(selectedMonthFile);
@@ -158,15 +154,14 @@
                     invoices = jsonData.map(row => {
                         const normalizedRow = {};
                         for (const key in row) {
-                            let cleanKey = key.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-                            normalizedRow[cleanKey] = row[key];
+                            normalizedRow[key.trim().toUpperCase()] = row[key];
                         }
                         return normalizedRow;
                     });
                 }
-                document.getElementById('result').textContent = 'Sincronización exitosa. Digita el número de casa.';
+                document.getElementById('result').textContent = 'Datos listos. Ingresa tu número de casa.';
             } catch (error) {
-                document.getElementById('result').textContent = 'Error de enlace de red con Google Sheets.';
+                document.getElementById('result').textContent = 'Error al cargar los datos del archivo.';
                 invoices = [];
             }
         }
@@ -184,35 +179,33 @@
                 return;
             }
 
-            // Búsqueda elástica inteligente del número de casa
-            const invoice = invoices.find(row => {
-                let casaVal = getProp(row, ['CASA']);
-                return cleanNumber(casaVal) == parseInt(houseNumber, 10);
-            });
+            // Busca usando la función getProp para blindar el campo 'CASA'
+            const invoice = invoices.find(row => cleanNumber(getProp(row, 'CASA')) == parseInt(houseNumber, 10));
 
             if (invoice) {
-                // Mapeo dinámico tolerante a variaciones de nombres de columnas de origen
-                let lecturaAnterior = cleanNumber(getProp(invoice, ['LECTURA ANTERIOR', 'ANT', 'ANTERIOR']));
-                let lecturaActual = cleanNumber(getProp(invoice, ['LECTURA ACTUAL', 'ACT', 'ACTUAL']));
+                // Se usa getProp en cada campo para evitar errores por espacios invisibles en el Excel/CSV
+                let lecturaAnterior = cleanNumber(getProp(invoice, 'LECTURA ANTERIOR'));
+                let lecturaActual = cleanNumber(getProp(invoice, 'LECTURA ACTUAL'));
                 
+                // Corrección automática si la lectura decimal se guardó erróneamente como miles
                 if (lecturaAnterior > 50000) lecturaAnterior = lecturaAnterior / 1000;
                 if (lecturaActual > 50000) lecturaActual = lecturaActual / 1000;
                 
                 const consumoAgua = lecturaActual - lecturaAnterior;
-                const valorM3 = cleanNumber(getProp(invoice, ['VALOR DE M3', 'VALOR M3', 'M3']));
+                const valorM3 = cleanNumber(getProp(invoice, 'VALOR DE M3'));
                 const subtotal = consumoAgua * valorM3;
                 
-                const consumoGeneral = cleanNumber(getProp(invoice, ['CONSUMO GENERAL', 'GENERAL']));
-                const gastoComun = cleanNumber(getProp(invoice, ['GASTO COMUN', 'GASTO']));
+                const consumoGeneral = cleanNumber(getProp(invoice, 'CONSUMO GENERAL'));
+                const gastoComun = cleanNumber(getProp(invoice, 'GASTO COMUN'));
                 const totalPagar = subtotal + consumoGeneral + gastoComun;
                 
-                const titular = getProp(invoice, ['NOMBRE', 'TITULAR', 'PROPIETARIO']) || 'No disponible';
-                const remarcador = getProp(invoice, ['REMARCADOR', 'N° REMARCADOR', 'NUMERO REMARCADOR']) || 'No disponible';
-                
-                const estadoExcel = (getProp(invoice, ['ESTADO']) || 'Por pagar').trim().toUpperCase();
+                const estadoExcel = (getProp(invoice, 'ESTADO') || 'Por pagar').trim().toUpperCase();
                 const esPagado = estadoExcel === 'PAGADO';
-                const claseEstado = esPagado ? 'pagado' : 'por-pagar';
+                const claseEstado = esPagado ? 'pagado' : 'por-parar';
                 const textoEstado = esPagado ? 'PAGADO' : 'POR PAGAR';
+
+                const titular = getProp(invoice, 'NOMBRE DEL TITULAR DE LA VIVIENDA') || 'No disponible';
+                const remarcador = getProp(invoice, 'N° REMARCADOR') || 'No disponible';
 
                 resultDiv.innerHTML = `
                     <h2>Factura para la Casa ${houseNumber}</h2>
