@@ -25,7 +25,8 @@
     <select id="monthSelector" onchange="loadSelectedMonth()">
         <option value="">Seleccionar...</option>
         
-        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv" data-tipo="google">Abril 2026 (En vivo)</option>
+        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv">Abril 2026 (En vivo)</option>
+        
         <option value="facturas_2026_03.xlsx" data-tipo="local">Marzo 2026</option>
         <option value="facturas_2026_02.xlsx" data-tipo="local">Febrero 2026</option>
         <option value="facturas_2026_01.xlsx" data-tipo="local">Enero 2026</option>
@@ -58,23 +59,58 @@
         let selectedMonthFile = '';
         let tipoOrigen = '';
 
-        function csvToJSON(csv) {
-            const lines = csv.split("\n");
+        // Función mejorada para leer correctamente CSV de Google Sheets protegiendo los valores con texto
+        function parseCSV(text) {
+            let p = '', c = '', r = [];
+            let q = false;
+            let row = [''];
+            for (let i=0; i<text.length; i++) {
+                c = text[i];
+                if (c === '"') { q = !q; }
+                else if (c === ',' && !q) { row.push(''); }
+                else if ((c === '\r' || c === '\n') && !q) {
+                    if (c === '\n' && p === '\r') { }
+                    else {
+                        r.push(row);
+                        row = [''];
+                    }
+                } else { row[row.length-1] += c; }
+                p = c;
+            }
+            if (row.length > 1 || row[0] !== '') { r.push(row); }
+            
             const result = [];
-            if(lines.length === 0 || !lines[0]) return result;
-            const headers = lines[0].split(",").map(h => h.replace(/["\r]/g, "").trim().toUpperCase());
-
-            for (let i = 1; i < lines.length; i++) {
-                if (!lines[i]) continue;
+            if (r.length === 0) return result;
+            const headers = r[0].map(h => h.trim().toUpperCase());
+            
+            for (let i = 1; i < r.length; i++) {
                 const obj = {};
-                const currentline = lines[i].split(",");
-
                 for (let j = 0; j < headers.length; j++) {
-                    obj[headers[j]] = currentline[j] ? currentline[j].replace(/["\r]/g, "").trim() : "";
+                    obj[headers[j]] = r[i][j] ? r[i][j].trim() : "";
                 }
                 result.push(obj);
             }
             return result;
+        }
+
+        // Limpia el texto de símbolos, espacios y convierte comas decimales para que Javascript calcule bien
+        function cleanNumber(val) {
+            if (!val) return 0;
+            let s = val.toString().replace(/[\$\s\u00A0]/g, '');
+            // Si el formato usa puntos como miles, los removemos.
+            // Para asegurar compatibilidad con el formato chileno/excel estándar:
+            if (s.includes(',') && s.includes('.')) {
+                s = s.replace(/\./g, '').replace(',', '.');
+            } else if (s.includes('.')) {
+                // Verificar si el punto actúa como separador de miles (ej: 7.000) o decimal
+                let parts = s.split('.');
+                if (parts[parts.length - 1].length === 3) {
+                    s = s.replace(/\./g, ''); // Remover miles
+                }
+            } else if (s.includes(',')) {
+                s = s.replace(/,/g, '.');
+            }
+            return parseFloat(s) || 0;
         }
 
         async function loadSelectedMonth() {
@@ -97,13 +133,13 @@
 
                 if (tipoOrigen === 'google') {
                     const csvText = await response.text();
-                    invoices = csvToJSON(csvText);
+                    invoices = parseCSV(csvText);
                 } else {
                     const data = await response.arrayBuffer();
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "No disponible" });
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "0" });
 
                     invoices = jsonData.map(row => {
                         const normalizedRow = {};
@@ -121,8 +157,7 @@
         }
 
         function formatCurrency(value) {
-            value = parseFloat(value) || 0;
-            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value);
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(Math.round(value));
         }
 
         function searchInvoice() {
@@ -137,14 +172,15 @@
             const invoice = invoices.find(row => row['CASA'] == houseNumber);
 
             if (invoice) {
-                const lecturaAnterior = parseFloat(invoice['LECTURA ANTERIOR']) || 0;
-                const lecturaActual = parseFloat(invoice['LECTURA ACTUAL']) || 0;
+                // Forzamos la limpieza numérica para recalcular en base a las celdas del Excel original
+                const lecturaAnterior = cleanNumber(invoice['LECTURA ANTERIOR']);
+                const lecturaActual = cleanNumber(invoice['LECTURA ACTUAL']);
                 const consumoAgua = lecturaActual - lecturaAnterior;
-                const valorM3 = parseFloat(invoice['VALOR DE M3']) || 0;
-                const subtotal = parseFloat(invoice['SUBTOTAL']) || 0;
-                const consumoGeneral = parseFloat(invoice['CONSUMO GENERAL']) || 0;
-                const gastoComun = parseFloat(invoice['GASTO COMUN']) || 0;
-                const totalPagar = subtotal + consumoGeneral + gastoComun;
+                const valorM3 = cleanNumber(invoice['VALOR DE M3']);
+                const subtotal = cleanNumber(invoice['SUBTOTAL']) || (consumoAgua * valorM3);
+                const consumoGeneral = cleanNumber(invoice['CONSUMO GENERAL']);
+                const gastoComun = cleanNumber(invoice['GASTO COMUN']);
+                const totalPagar = cleanNumber(invoice['TOTAL A PAGAR']) || (subtotal + consumoGeneral + gastoComun);
                 
                 const estadoExcel = (invoice['ESTADO'] || 'Por pagar').trim().toUpperCase();
                 const esPagado = estadoExcel === 'PAGADO';
@@ -157,8 +193,8 @@
                         <tr><th>Campo</th><th>Valor</th></tr>
                         <tr><td>ESTADO DE LA FACTURA</td><td><span class="badge ${claseEstado}">${textoEstado}</span></td></tr>
                         <tr><td>CASA</td><td>${invoice['CASA']}</td></tr>
-                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
-                        <tr><td>N° REMARCADOR</td><td>${invoice['N° REMARCADOR']}</td></tr>
+                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA'] || 'No disponible'}</td></tr>
+                        <tr><td>N° REMARCADOR</td><td>${invoice['N° REMARCADOR'] || 'No disponible'}</td></tr>
                         <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior}</td></tr>
                         <tr><td>LECTURA ACTUAL</td><td>${lecturaActual}</td></tr>
                         <tr><td>CONSUMO DE AGUA M3</td><td>${consumoAgua.toFixed(2)}</td></tr>
@@ -176,7 +212,6 @@
     </script>
 </body>
 </html>
-
 
 
 
