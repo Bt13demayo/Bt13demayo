@@ -25,7 +25,7 @@
     <select id="monthSelector" onchange="loadSelectedMonth()">
         <option value="">Seleccionar...</option>
         
-        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv">Abril 2026 (En vivo)</option>
+        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv">Abril 2026</option>
         
         <option value="facturas_2026_03.xlsx" data-tipo="local">Marzo 2026</option>
         <option value="facturas_2026_02.xlsx" data-tipo="local">Febrero 2026</option>
@@ -59,7 +59,6 @@
         let selectedMonthFile = '';
         let tipoOrigen = '';
 
-        // Función mejorada para leer correctamente CSV de Google Sheets protegiendo los valores con texto
         function parseCSV(text) {
             let p = '', c = '', r = [];
             let q = false;
@@ -93,24 +92,23 @@
             return result;
         }
 
-        // Limpia el texto de símbolos, espacios y convierte comas decimales para que Javascript calcule bien
+        // Limpiador numérico estricto para corregir formatos de Chile/Excel
         function cleanNumber(val) {
             if (!val) return 0;
+            // Quitar signos de peso, espacios y caracteres invisibles de formato
             let s = val.toString().replace(/[\$\s\u00A0]/g, '');
-            // Si el formato usa puntos como miles, los removemos.
-            // Para asegurar compatibilidad con el formato chileno/excel estándar:
-            if (s.includes(',') && s.includes('.')) {
+            
+            // Caso 1: Tiene puntos de miles y comas decimales (ej: 63.006,05)
+            if (s.includes('.') && s.includes(',')) {
                 s = s.replace(/\./g, '').replace(',', '.');
-            } else if (s.includes('.')) {
-                // Verificar si el punto actúa como separador de miles (ej: 7.000) o decimal
-                let parts = s.split('.');
-                if (parts[parts.length - 1].length === 3) {
-                    s = s.replace(/\./g, ''); // Remover miles
-                }
-            } else if (s.includes(',')) {
+            } 
+            // Caso 2: Google Sheets transformó comas en puntos decimales directamente
+            else if (s.includes(',')) {
                 s = s.replace(/,/g, '.');
             }
-            return parseFloat(s) || 0;
+            
+            let num = parseFloat(s);
+            return isNaN(num) ? 0 : num;
         }
 
         async function loadSelectedMonth() {
@@ -172,15 +170,26 @@
             const invoice = invoices.find(row => row['CASA'] == houseNumber);
 
             if (invoice) {
-                // Forzamos la limpieza numérica para recalcular en base a las celdas del Excel original
-                const lecturaAnterior = cleanNumber(invoice['LECTURA ANTERIOR']);
-                const lecturaActual = cleanNumber(invoice['LECTURA ACTUAL']);
+                // 1. Extraer lecturas base limpias
+                let lecturaAnterior = cleanNumber(invoice['LECTURA ANTERIOR']);
+                let lecturaActual = cleanNumber(invoice['LECTURA ACTUAL']);
+                
+                // 2. Corregir desajuste si Google exportó los decimales corridos (ej: 112191 en lugar de 112.191)
+                if (lecturaAnterior > 50000) lecturaAnterior = lecturaAnterior / 1000;
+                if (lecturaActual > 50000) lecturaActual = lecturaActual / 1000;
+                
+                // 3. Forzar los cálculos matemáticos puros directamente en la web
                 const consumoAgua = lecturaActual - lecturaAnterior;
                 const valorM3 = cleanNumber(invoice['VALOR DE M3']);
-                const subtotal = cleanNumber(invoice['SUBTOTAL']) || (consumoAgua * valorM3);
+                
+                // Calculamos el subtotal directamente para que no lea el texto roto de Google
+                const subtotal = consumoAgua * valorM3;
+                
                 const consumoGeneral = cleanNumber(invoice['CONSUMO GENERAL']);
                 const gastoComun = cleanNumber(invoice['GASTO COMUN']);
-                const totalPagar = cleanNumber(invoice['TOTAL A PAGAR']) || (subtotal + consumoGeneral + gastoComun);
+                
+                // Sumamos el total neto en vivo
+                const totalPagar = subtotal + consumoGeneral + gastoComun;
                 
                 const estadoExcel = (invoice['ESTADO'] || 'Por pagar').trim().toUpperCase();
                 const esPagado = estadoExcel === 'PAGADO';
@@ -195,9 +204,9 @@
                         <tr><td>CASA</td><td>${invoice['CASA']}</td></tr>
                         <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA'] || 'No disponible'}</td></tr>
                         <tr><td>N° REMARCADOR</td><td>${invoice['N° REMARCADOR'] || 'No disponible'}</td></tr>
-                        <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior}</td></tr>
-                        <tr><td>LECTURA ACTUAL</td><td>${lecturaActual}</td></tr>
-                        <tr><td>CONSUMO DE AGUA M3</td><td>${consumoAgua.toFixed(2)}</td></tr>
+                        <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior.toFixed(3)}</td></tr>
+                        <tr><td>LECTURA ACTUAL</td><td>${lecturaActual.toFixed(3)}</td></tr>
+                        <tr><td>CONSUMO DE AGUA M3</td><td>${consumoAgua.toFixed(3)}</td></tr>
                         <tr><td>VALOR DE M3</td><td>${formatCurrency(valorM3)}</td></tr>
                         <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
                         <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
@@ -212,11 +221,6 @@
     </script>
 </body>
 </html>
-
-
-
-
-
 
 
 
