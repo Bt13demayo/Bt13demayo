@@ -6,58 +6,83 @@
     <title>Consulta de Factura de Agua</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f9f9f9; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #0275d8; font-size: 24px; }
-        label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; }
-        select, input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 12px; background-color: #0275d8; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        button:hover { background-color: #01549b; }
-        #result { margin-top: 20px; padding: 15px; border-radius: 5px; font-size: 15px; }
-        .status-msg { text-align: center; font-weight: bold; color: #666; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        table, th, td { border: 1px solid #ddd; }
-        th, td { padding: 10px; text-align: left; }
-        th { background-color: #f4f4f4; width: 50%; }
-        .badge { padding: 6px 12px; border-radius: 4px; font-weight: bold; display: inline-block; }
-        .pagado { background-color: #d4edda; color: #155724; }
-        .por-pagar { background-color: #f8d7da; color: #721c24; }
-        .destacado { font-weight: bold; color: #d9534f; background-color: #f9f2f2; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Consulta de Factura de Agua</h1>
-        <p style="text-align: center; color: #666;">BT 13 de Mayo</p>
+    <h1>Consulta de Factura de Agua</h1>
+    <p>Selecciona el mes y año de la factura, e introduce el número de casa:</p>
+    
+    <label for="monthSelector">Mes y Año:</label>
+    <select id="monthSelector" onchange="loadSelectedMonth()">
+        <option value="">Seleccionar...</option>
         
-        <label for="monthSelector">Selecciona Mes y Año:</label>
-        <select id="monthSelector" onchange="loadSelectedMonth()">
-            <option value="">Seleccionar...</option>
-            <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv" data-tipo="google">Abril 2026 (En vivo)</option>
-            <option value="facturas_2026_03.xlsx" data-tipo="local">Marzo 2026</option>
-            <option value="facturas_2026_02.xlsx" data-tipo="local">Febrero 2026</option>
-        </select>
+        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv" data-tipo="google">Abril 2026 (En vivo)</option>
 
-        <label for="houseNumber">Introduce el Número de Casa:</label>
-        <input type="number" id="houseNumber" placeholder="Ej: 7" min="1" />
-        
-        <button onclick="searchInvoice()">Buscar Factura</button>
+        <option value="facturas_2026_03.xlsx" data-tipo="excel">Marzo 2026</option>
+        <option value="facturas_2026_02.xlsx" data-tipo="excel">Febrero 2026</option>
+        <option value="facturas_2026_01.xlsx" data-tipo="excel">Enero 2026</option>
+        <option value="facturas_2025_12.xlsx" data-tipo="excel">Diciembre 2025</option>
+        <option value="facturas_2025_11.xlsx" data-tipo="excel">Noviembre 2025</option>
+        <option value="facturas_2025_10.xlsx" data-tipo="excel">Octubre 2025</option>
+        <option value="facturas_2025_09.xlsx" data-tipo="excel">Septiembre 2025</option>
+        <option value="facturas_2025_08.xlsx" data-tipo="excel">Agosto 2025</option>
+        <option value="facturas_2025_07.xlsx" data-tipo="excel">Julio 2025</option>
+        <option value="facturas_2025_06.xlsx" data-tipo="excel">Junio 2025</option>
+        <option value="facturas_2025_05.xlsx" data-tipo="excel">Mayo 2025</option>
+        <option value="facturas_2025_04.xlsx" data-tipo="excel">Abril 2025</option>
+        <option value="facturas_2025_03.xlsx" data-tipo="excel">Marzo 2025</option>
+        <option value="facturas_2025_02.xlsx" data-tipo="excel">Febrero 2025</option>
+        <option value="facturas_2025_01.xlsx" data-tipo="excel">Enero 2025</option>
+        <option value="facturas_2024_12.xlsx" data-tipo="excel">Diciembre 2024</option>
+        <option value="facturas_2024_11.xlsx" data-tipo="excel">Noviembre 2024</option>
+    </select>
 
-        <div id="result" class="status-msg">Selecciona un mes para comenzar.</div>
-    </div>
+    <br><br>
+
+    <label for="houseNumber">Número de Casa:</label>
+    <input type="number" id="houseNumber" />
+    <button onclick="searchInvoice()">Buscar</button>
+
+    <div id="result"></div>
 
     <script>
         let invoices = [];
         let selectedMonthFile = '';
         let tipoOrigen = '';
 
+        // Procesa el texto CSV que envía Google Sheets en tiempo real
         function parseSpanishCSV(text) {
             const lines = text.split(/\r?\n/);
             const result = [];
             if (lines.length === 0 || !lines[0]) return result;
             
             const separator = lines[0].includes(";") ? ";" : ",";
-            const headers = lines[0].split(separator).map(h => h.replace(/["\r]/g, "").trim().toUpperCase());
+            const headers = lines[0].split(separator).map(h => h.replace(/["\r]/g, "").toUpperCase());
 
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i] || lines[i].trim() === "") continue;
@@ -68,63 +93,32 @@
                     let val = currentline[j] ? currentline[j].replace(/["\r]/g, "").trim() : "";
                     obj[headers[j]] = val;
                 }
-                // Evitamos procesar filas basura o vacías que desalinean todo
-                if (obj[headers[0]] !== "") {
-                    result.push(obj);
-                }
+                result.push(obj);
             }
             return result;
-        }
-
-        function cleanNumber(val) {
-            if (val === undefined || val === null || val === "") return 0;
-            if (typeof val === 'number') return val;
-            let s = val.toString().replace(/[\$\s\u00A0]/g, '');
-            if (s.includes('.') && s.includes(',')) {
-                s = s.replace(/\./g, '').replace(',', '.');
-            } else if (s.includes(',')) {
-                let parts = s.split(',');
-                s = (parts[parts.length - 1].length === 3) ? s.replace(/,/g, '') : s.replace(/,/g, '.');
-            } else if (s.includes('.')) {
-                let parts = s.split('.');
-                if (parts[parts.length - 1].length === 3) s = s.replace(/\./g, '');
-            }
-            let num = parseFloat(s);
-            return isNaN(num) ? 0 : num;
-        }
-
-        function getProp(obj, targetKey) {
-            const search = targetKey.trim().toUpperCase();
-            for (let key in obj) {
-                if (key.trim().toUpperCase() === search) return obj[key];
-            }
-            return "";
         }
 
         async function loadSelectedMonth() {
             const selector = document.getElementById('monthSelector');
             const selectedOption = selector.options[selector.selectedIndex];
             selectedMonthFile = selector.value;
-            tipoOrigen = selectedOption.getAttribute('data-tipo');
-            const resultDiv = document.getElementById('result');
+            tipoOrigen = selectedOption.getAttribute('data-tipo') || 'excel';
 
             if (!selectedMonthFile) {
-                resultDiv.textContent = 'Selecciona un mes para comenzar.';
+                document.getElementById('result').textContent = 'Por favor, selecciona un mes.';
                 invoices = [];
                 return;
             }
 
-            resultDiv.textContent = 'Sincronizando datos originales sin caché...';
-
             try {
-                // Truco de Cache-Busting para reventar el retraso de Google Sheets
+                // Evita que el navegador guarde en caché datos viejos de Google Sheets
                 let url = selectedMonthFile;
                 if (tipoOrigen === 'google') {
                     url += (url.includes('?') ? '&' : '?') + 'nocache=' + new Date().getTime();
                 }
 
                 const response = await fetch(url);
-                if (!response.ok) throw new Error();
+                if (!response.ok) throw new Error('No se pudo conectar a la base de datos.');
 
                 if (tipoOrigen === 'google') {
                     const csvText = await response.text();
@@ -133,84 +127,112 @@
                     const data = await response.arrayBuffer();
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "No disponible" });
 
                     invoices = jsonData.map(row => {
                         const normalizedRow = {};
                         for (const key in row) {
-                            normalizedRow[key.trim().toUpperCase()] = row[key];
+                            const normalizedKey = key.replace(/[\r\n]/g, "").toUpperCase();
+                            normalizedRow[normalizedKey] = row[key];
                         }
                         return normalizedRow;
                     });
                 }
-                resultDiv.textContent = 'Datos sincronizados correctamente. Ingresa la casa.';
+
+                document.getElementById('result').textContent = 'Datos cargados con éxito. Ingresa la casa y busca.';
             } catch (error) {
-                resultDiv.textContent = 'Error al cargar los datos en tiempo real.';
+                console.error('Error:', error);
+                document.getElementById('result').textContent = 'Error al conectar con la base de datos.';
                 invoices = [];
             }
         }
 
         function formatCurrency(value) {
-            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(Math.round(value));
+            if (typeof value === "string") value = parseNumber(value);
+            return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(value || 0);
+        }
+
+        // Limpiador numérico adaptado al formato exacto de tu Google Sheets chileno
+        function parseNumber(value) {
+            if (value === undefined || value === null || value === "No disponible" || value === "") return 0;
+            if (typeof value === 'number') return value;
+            
+            let s = value.toString().replace(/[\$\s\u00A0]/g, '');
+            
+            if (s.includes('.') && s.includes(',')) {
+                s = s.replace(/\./g, '').replace(',', '.');
+            } else if (s.includes(',')) {
+                let parts = s.split(',');
+                s = (parts[parts.length - 1].length === 3) ? s.replace(/,/g, '') : s.replace(/,/g, '.');
+            } else if (s.includes('.')) {
+                let parts = s.split('.');
+                if (parts[parts.length - 1].length === 3) {
+                    s = s.replace(/\./g, '');
+                }
+            }
+            let num = parseFloat(s);
+            return isNaN(num) ? 0 : num;
+        }
+
+        // Busca una propiedad en la fila ignorando variaciones de espacios en los extremos
+        function getProp(row, keyName) {
+            const target = keyName.trim().toUpperCase();
+            for (let k in row) {
+                if (k.trim().toUpperCase() === target) return row[k];
+            }
+            return '';
         }
 
         function searchInvoice() {
-            const houseNumber = document.getElementById('houseNumber').value;
+            const houseNumber = document.getElementById('houseNumber').value.trim();
             const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';
 
             if (!houseNumber || !selectedMonthFile) {
-                resultDiv.textContent = 'Por favor, selecciona un mes e introduce el número de tu casa.';
+                resultDiv.textContent = 'Por favor, selecciona un mes y un número de casa.';
                 return;
             }
 
-            const targetHouse = parseInt(houseNumber, 10);
-            
-            // FILTRO INTELIGENTE CRUZADO: Busca que coincida el número entero de la casa
             const invoice = invoices.find(row => {
-                const casaVal = parseInt(cleanNumber(getProp(row, 'CASA')), 10);
-                return casaVal === targetHouse;
+                let casaVal = getProp(row, 'CASA').toString().trim();
+                return casaVal == houseNumber;
             });
 
             if (invoice) {
-                let lecturaAnterior = cleanNumber(getProp(invoice, 'LECTURA ANTERIOR'));
-                let lecturaActual = cleanNumber(getProp(invoice, 'LECTURA ACTUAL'));
+                const titular = getProp(invoice, 'NOMBRE DEL TITULAR DE LA VIVIENDA') || 'No disponible';
+                const remarcador = getProp(invoice, 'N° REMARCADOR') || 'No disponible';
                 
-                if (lecturaAnterior > 50000) lecturaAnterior /= 1000;
-                if (lecturaActual > 50000) lecturaActual /= 1000;
+                // Muestra el texto original de los m³ de agua tal cual están en tu planilla
+                const lecturaAnterior = getProp(invoice, 'LECTURA ANTERIOR') || '0';
+                const lecturaActual = getProp(invoice, 'LECTURA ACTUAL') || '0';
+                const consumoAgua = getProp(invoice, 'CONSUMO DE AGUA M3') || '0';
                 
-                const consumoAgua = lecturaActual - lecturaAnterior;
-                const valorM3 = cleanNumber(getProp(invoice, 'VALOR DE M3'));
-                const subtotal = consumoAgua * valorM3;
-                const consumoGeneral = cleanNumber(getProp(invoice, 'CONSUMO GENERAL'));
-                const gastoComun = cleanNumber(getProp(invoice, 'GASTO COMUN'));
-                const totalPagar = subtotal + consumoGeneral + gastoComun;
-                
-                const titular = getProp(invoice, 'NOMBRE DEL TITULAR DE LA VIVIENDA') || 'No asignado';
-                const remarcador = getProp(invoice, 'N° REMARCADOR') || 'S/N';
-                
-                const estadoExcel = (getProp(invoice, 'ESTADO') || 'Por pagar').trim().toUpperCase();
-                const esPagado = estadoExcel === 'PAGADO';
-                const claseEstado = esPagado ? 'pagado' : 'por-pagar';
-                const textoEstado = esPagado ? 'PAGADO' : 'POR PAGAR';
+                // Formatea correctamente los montos de dinero según tu Google Sheets
+                const valorM3 = parseNumber(getProp(invoice, 'VALOR DE M3'));
+                const subtotal = parseNumber(getProp(invoice, 'SUBTOTAL'));
+                const consumoGeneral = parseNumber(getProp(invoice, 'CONSUMO GENERAL'));
+                const gastoComun = parseNumber(getProp(invoice, 'GASTO COMUN'));
+                const totalPagar = parseNumber(getProp(invoice, 'TOTAL A PAGAR'));
 
                 resultDiv.innerHTML = `
-                    <h2 style="text-align:center;">Detalle Casa ${targetHouse}</h2>
-                    <p style="text-align:center;"><span class="badge ${claseEstado}">${textoEstado}</span></p>
+                    <h2>Factura para la Casa ${houseNumber}</h2>
                     <table>
-                        <tr><th>Titular</th><td>${titular}</td></tr>
-                        <tr><th>N° Remarcador</th><td>${remarcador}</td></tr>
-                        <tr><th>Lectura Anterior</th><td>${lecturaAnterior.toFixed(3)} m³</td></tr>
-                        <tr><th>Lectura Actual</th><td>${lecturaActual.toFixed(3)} m³</td></tr>
-                        <tr><th>Consumo de Agua</th><td>${consumoAgua.toFixed(3)} m³</td></tr>
-                        <tr><th>Valor por m³</th><td>${formatCurrency(valorM3)}</td></tr>
-                        <tr><th>Subtotal Consumo</th><td>${formatCurrency(subtotal)}</td></tr>
-                        <tr><th>Consumo General</th><td>${formatCurrency(consumoGeneral)}</td></tr>
-                        <tr><th>Gasto Común</th><td>${formatCurrency(gastoComun)}</td></tr>
-                        <tr class="destacado"><th>TOTAL A PAGAR</th><td>${formatCurrency(totalPagar)}</td></tr>
+                        <tr><th>Campo</th><th>Valor</th></tr>
+                        <tr><td>CASA</td><td>${houseNumber}</td></tr>
+                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${titular}</td></tr>
+                        <tr><td>N° REMARCADOR</td><td>${remarcador}</td></tr>
+                        <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior} m³</td></tr>
+                        <tr><td>LECTURA ACTUAL</td><td>${lecturaActual} m³</td></tr>
+                        <tr><td>CONSUMO DE AGUA M3</td><td>${consumoAgua} m³</td></tr>
+                        <tr><td>VALOR DE M3</td><td>${formatCurrency(valorM3)}</td></tr>
+                        <tr><td>SUBTOTAL</td><td>${formatCurrency(subtotal)}</td></tr>
+                        <tr><td>CONSUMO GENERAL</td><td>${formatCurrency(consumoGeneral)}</td></tr>
+                        <tr><td>GASTO COMUN</td><td>${formatCurrency(gastoComun)}</td></tr>
+                        <tr style="font-weight: bold; background-color: #f9f2f2;"><td>TOTAL A PAGAR</td><td>${formatCurrency(totalPagar)}</td></tr>
                     </table>
                 `;
             } else {
-                resultDiv.textContent = `No se encontró información para la casa N° ${houseNumber}.`;
+                resultDiv.textContent = `No se encontró información para la casa ${houseNumber}.`;
             }
         }
     </script>
