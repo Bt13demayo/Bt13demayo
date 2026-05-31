@@ -25,7 +25,7 @@
     <select id="monthSelector" onchange="loadSelectedMonth()">
         <option value="">Seleccionar...</option>
         
-        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pubhtml">Abril 2026 (En vivo)</option>
+        <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-Yp_HqhoN8Ax-pQVKdVyxL7ywJXjink1tlfZQB0xul9hH3VN8ICB8Vw27qJfOynIxYmBA87zXPyYz/pub?output=csv" data-tipo="google">Abril 2026 (En vivo)</option>
         
         <option value="facturas_2026_03.xlsx" data-tipo="local">Marzo 2026</option>
         <option value="facturas_2026_02.xlsx" data-tipo="local">Febrero 2026</option>
@@ -59,16 +59,48 @@
         let selectedMonthFile = '';
         let tipoOrigen = '';
 
-        // Limpiador numérico estricto y adaptativo
+        // Procesador especializado para CSV generado en español (separado por punto y coma)
+        function parseSpanishCSV(text) {
+            const lines = text.split(/\r?\n/);
+            const result = [];
+            if (lines.length === 0 || !lines[0]) return result;
+            
+            // Forzamos la separación por punto y coma ';' que es el estándar de Google Sheets en español
+            const headers = lines[0].split(";").map(h => h.replace(/["\r]/g, "").trim().toUpperCase());
+
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i]) continue;
+                const obj = {};
+                const currentline = lines[i].split(";");
+
+                for (let j = 0; j < headers.length; j++) {
+                    let val = currentline[j] ? currentline[j].replace(/["\r]/g, "").trim() : "";
+                    obj[headers[j]] = val;
+                }
+                result.push(obj);
+            }
+            return result;
+        }
+
+        // Limpiador numérico estricto para valores monetarios y lecturas chilenas
         function cleanNumber(val) {
             if (val === undefined || val === null || val === "") return 0;
             if (typeof val === 'number') return val;
 
+            // Quitar signo de pesos, puntos de miles y espacios
             let s = val.toString().replace(/[\$\s\u00A0]/g, '');
+            
+            // Reemplazar la coma decimal típica de Excel/Google Sheets por un punto para Javascript
             if (s.includes('.') && s.includes(',')) {
                 s = s.replace(/\./g, '').replace(',', '.');
             } else if (s.includes(',')) {
                 s = s.replace(/,/g, '.');
+            } else if (s.includes('.')) {
+                // Si viene un número como '7.000' (sin comas), quitamos el punto para que se lea como siete mil enteros
+                let parts = s.split('.');
+                if (parts[parts.length - 1].length === 3) {
+                    s = s.replace(/\./g, '');
+                }
             }
             
             let num = parseFloat(s);
@@ -87,37 +119,33 @@
                 return;
             }
 
-            document.getElementById('result').textContent = 'Conectando con Google Drive...';
+            document.getElementById('result').textContent = 'Cargando datos del mes...';
 
             try {
-                let url = selectedMonthFile;
-                
-                // Hack para transformar tu link de edición directo en un flujo binario descargable
-                if (tipoOrigen === 'google_excel' && url.includes('docs.google.com/spreadsheets')) {
-                    let fileId = url.split('/d/')[1].split('/')[0];
-                    url = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
-                }
-
-                const response = await fetch(url);
+                const response = await fetch(selectedMonthFile);
                 if (!response.ok) throw new Error();
 
-                const data = await response.arrayBuffer();
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
-                const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "0" });
+                if (tipoOrigen === 'google') {
+                    const csvText = await response.text();
+                    invoices = parseSpanishCSV(csvText);
+                } else {
+                    const data = await response.arrayBuffer();
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "0" });
 
-                invoices = jsonData.map(row => {
-                    const normalizedRow = {};
-                    for (const key in row) {
-                        normalizedRow[key.trim().toUpperCase()] = row[key];
-                    }
-                    return normalizedRow;
-                });
-
-                document.getElementById('result').textContent = 'Datos en vivo cargados con éxito. Introduce tu número de casa.';
+                    invoices = jsonData.map(row => {
+                        const normalizedRow = {};
+                        for (const key in row) {
+                            normalizedRow[key.trim().toUpperCase()] = row[key];
+                        }
+                        return normalizedRow;
+                    });
+                }
+                document.getElementById('result').textContent = 'Datos listos. Ingresa tu número de casa.';
             } catch (error) {
-                document.getElementById('result').textContent = 'Error al leer el archivo en vivo. Asegúrate de que el archivo en Drive esté compartido como "Cualquier persona con el enlace puede ver".';
+                document.getElementById('result').textContent = 'Error al cargar los datos de este mes.';
                 invoices = [];
             }
         }
@@ -138,12 +166,15 @@
             const invoice = invoices.find(row => row['CASA'] == houseNumber);
 
             if (invoice) {
+                // 1. Extraer lecturas numéricas
                 let lecturaAnterior = cleanNumber(invoice['LECTURA ANTERIOR']);
                 let lecturaActual = cleanNumber(invoice['LECTURA ACTUAL']);
                 
+                // Corrección por si Google exportó quitando el punto decimal flotante (ej: 112191 en vez de 112.191)
                 if (lecturaAnterior > 50000) lecturaAnterior = lecturaAnterior / 1000;
                 if (lecturaActual > 50000) lecturaActual = lecturaActual / 1000;
                 
+                // 2. Cálculos matemáticos puros basados en la hoja
                 const consumoAgua = lecturaActual - lecturaAnterior;
                 const valorM3 = cleanNumber(invoice['VALOR DE M3']);
                 const subtotal = consumoAgua * valorM3;
