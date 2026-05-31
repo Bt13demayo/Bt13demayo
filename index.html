@@ -59,15 +59,21 @@
         let selectedMonthFile = '';
         let tipoOrigen = '';
 
-        // Convierte el texto CSV de Google Sheets en una lista de objetos legibles
+        // Función avanzada de parsing que remueve comillas y limpia los encabezados
         function parseSpanishCSV(text) {
             const lines = text.split(/\r?\n/);
             const result = [];
             if (lines.length === 0 || !lines[0]) return result;
             
-            // Detecta automáticamente si el separador es coma o punto y coma
             const separator = lines[0].includes(";") ? ";" : ",";
-            const headers = lines[0].split(separator).map(h => h.replace(/["\r]/g, "").trim().toUpperCase());
+            
+            // Limpieza absoluta de encabezados: quitamos comillas, acentos, espacios y forzamos mayúsculas
+            const headers = lines[0].split(separator).map(h => 
+                h.replace(/["\r]/g, "")
+                 .trim()
+                 .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar tildes
+                 .toUpperCase()
+            );
 
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i]) continue;
@@ -83,38 +89,42 @@
             return result;
         }
 
-        // CORRECCIÓN CLAVE: Remueve símbolos, espacios ocultos y estandariza los decimales/miles
+        // Limpiador numérico inmune a formatos de moneda de Google Sheets
         function cleanNumber(val) {
             if (val === undefined || val === null || val === "") return 0;
             if (typeof val === 'number') return val;
 
-            // Quita signos de peso ($), espacios en blanco normales y espacios duros de Sheets
             let s = val.toString().replace(/[\$\s\u00A0]/g, '');
             
-            // Caso 1: Tiene puntos de miles y coma decimal (Ej: 63.006,05)
             if (s.includes('.') && s.includes(',')) {
                 s = s.replace(/\./g, '').replace(',', '.');
-            } 
-            // Caso 2: Tiene solo comas (Ej: 112,191 o 7,000 interpretado como miles)
-            else if (s.includes(',')) {
-                // Si la coma está seguida por exactamente 3 dígitos, Sheets la exportó como separador de miles
+            } else if (s.includes(',')) {
                 let parts = s.split(',');
                 if (parts[parts.length - 1].length === 3) {
-                    s = s.replace(/,/g, ''); // Remover para dejar entero (Ej: 7000)
+                    s = s.replace(/,/g, ''); 
                 } else {
-                    s = s.replace(/,/g, '.'); // Conservar como punto decimal
+                    s = s.replace(/,/g, '.'); 
                 }
-            } 
-            // Caso 3: Tiene solo puntos (Ej: 7.000 como formato chileno de miles)
-            else if (s.includes('.')) {
+            } else if (s.includes('.')) {
                 let parts = s.split('.');
                 if (parts[parts.length - 1].length === 3) {
-                    s = s.replace(/\./g, ''); // Remover para que "7.000" sea un "7000" puro
+                    s = s.replace(/\./g, ''); 
                 }
             }
             
             let num = parseFloat(s);
             return isNaN(num) ? 0 : num;
+        }
+
+        // Función auxiliar para buscar campos de texto de manera flexible
+        function getProp(obj, keywords) {
+            for (let key in obj) {
+                let normalizedKey = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+                if (keywords.some(k => normalizedKey.includes(k))) {
+                    return obj[key];
+                }
+            }
+            return "";
         }
 
         async function loadSelectedMonth() {
@@ -129,7 +139,7 @@
                 return;
             }
 
-            document.getElementById('result').textContent = 'Cargando datos del mes...';
+            document.getElementById('result').textContent = 'Sincronizando datos originales...';
 
             try {
                 const response = await fetch(selectedMonthFile);
@@ -148,14 +158,15 @@
                     invoices = jsonData.map(row => {
                         const normalizedRow = {};
                         for (const key in row) {
-                            normalizedRow[key.trim().toUpperCase()] = row[key];
+                            let cleanKey = key.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+                            normalizedRow[cleanKey] = row[key];
                         }
                         return normalizedRow;
                     });
                 }
-                document.getElementById('result').textContent = 'Datos listos. Ingresa tu número de casa.';
+                document.getElementById('result').textContent = 'Sincronización exitosa. Digita el número de casa.';
             } catch (error) {
-                document.getElementById('result').textContent = 'Error al cargar los datos del archivo.';
+                document.getElementById('result').textContent = 'Error de enlace de red con Google Sheets.';
                 invoices = [];
             }
         }
@@ -173,26 +184,32 @@
                 return;
             }
 
-            // Busca el número de casa ignorando ceros a la izquierda
-            const invoice = invoices.find(row => cleanNumber(row['CASA']) == parseInt(houseNumber, 10));
+            // Búsqueda elástica inteligente del número de casa
+            const invoice = invoices.find(row => {
+                let casaVal = getProp(row, ['CASA']);
+                return cleanNumber(casaVal) == parseInt(houseNumber, 10);
+            });
 
             if (invoice) {
-                let lecturaAnterior = cleanNumber(invoice['LECTURA ANTERIOR']);
-                let lecturaActual = cleanNumber(invoice['LECTURA ACTUAL']);
+                // Mapeo dinámico tolerante a variaciones de nombres de columnas de origen
+                let lecturaAnterior = cleanNumber(getProp(invoice, ['LECTURA ANTERIOR', 'ANT', 'ANTERIOR']));
+                let lecturaActual = cleanNumber(getProp(invoice, ['LECTURA ACTUAL', 'ACT', 'ACTUAL']));
                 
-                // Corrección automática si la lectura decimal se guardó erróneamente como miles
                 if (lecturaAnterior > 50000) lecturaAnterior = lecturaAnterior / 1000;
                 if (lecturaActual > 50000) lecturaActual = lecturaActual / 1000;
                 
                 const consumoAgua = lecturaActual - lecturaAnterior;
-                const valorM3 = cleanNumber(invoice['VALOR DE M3']);
+                const valorM3 = cleanNumber(getProp(invoice, ['VALOR DE M3', 'VALOR M3', 'M3']));
                 const subtotal = consumoAgua * valorM3;
                 
-                const consumoGeneral = cleanNumber(invoice['CONSUMO GENERAL']);
-                const gastoComun = cleanNumber(invoice['GASTO COMUN']);
+                const consumoGeneral = cleanNumber(getProp(invoice, ['CONSUMO GENERAL', 'GENERAL']));
+                const gastoComun = cleanNumber(getProp(invoice, ['GASTO COMUN', 'GASTO']));
                 const totalPagar = subtotal + consumoGeneral + gastoComun;
                 
-                const estadoExcel = (invoice['ESTADO'] || 'Por pagar').trim().toUpperCase();
+                const titular = getProp(invoice, ['NOMBRE', 'TITULAR', 'PROPIETARIO']) || 'No disponible';
+                const remarcador = getProp(invoice, ['REMARCADOR', 'N° REMARCADOR', 'NUMERO REMARCADOR']) || 'No disponible';
+                
+                const estadoExcel = (getProp(invoice, ['ESTADO']) || 'Por pagar').trim().toUpperCase();
                 const esPagado = estadoExcel === 'PAGADO';
                 const claseEstado = esPagado ? 'pagado' : 'por-pagar';
                 const textoEstado = esPagado ? 'PAGADO' : 'POR PAGAR';
@@ -203,8 +220,8 @@
                         <tr><th>Campo</th><th>Valor</th></tr>
                         <tr><td>ESTADO DE LA FACTURA</td><td><span class="badge ${claseEstado}">${textoEstado}</span></td></tr>
                         <tr><td>CASA</td><td>${houseNumber}</td></tr>
-                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA'] || 'No disponible'}</td></tr>
-                        <tr><td>N° REMARCADOR</td><td>${invoice['N° REMARCADOR'] || 'No disponible'}</td></tr>
+                        <tr><td>NOMBRE DEL TITULAR DE LA VIVIENDA</td><td>${titular}</td></tr>
+                        <tr><td>N° REMARCADOR</td><td>${remarcador}</td></tr>
                         <tr><td>LECTURA ANTERIOR</td><td>${lecturaAnterior.toFixed(3)}</td></tr>
                         <tr><td>LECTURA ACTUAL</td><td>${lecturaActual.toFixed(3)}</td></tr>
                         <tr><td>CONSUMO DE AGUA M3</td><td>${consumoAgua.toFixed(3)}</td></tr>
@@ -222,4 +239,3 @@
     </script>
 </body>
 </html>
-
