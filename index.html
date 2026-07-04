@@ -99,6 +99,13 @@
 
         if (!invoice) { resultDiv.innerHTML = 'No se encontró información.'; return; }
 
+        // CÁLCULO MANUAL (Ignoramos la columna final del Excel para evitar errores)
+        const subtotalCalculado = parseNumber(invoice['CONSUMO DE AGUA M3']) * parseNumber(invoice['VALOR DE M3']);
+        const gastoComun = parseNumber(invoice['GASTO COMUN']);
+        const consumoGral = parseNumber(invoice['CONSUMO GENERAL']);
+        const saldoAnt = parseNumber(invoice['SALDO ANTERIOR']);
+        const totalFinal = subtotalCalculado + gastoComun + consumoGral + saldoAnt;
+
         resultDiv.innerHTML = `
         <div id="printArea" class="comprobante">
             <div class="header"><h3>Comprobante de Pago</h3></div>
@@ -111,13 +118,13 @@
                     <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
                     <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
                     <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
-                    <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(invoice['CONSUMO GENERAL'])}</td></tr>
-                    <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(invoice['GASTO COMUN'])}</td></tr>
-                    <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(invoice['SALDO ANTERIOR'])}</td></tr>
+                    <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(consumoGral)}</td></tr>
+                    <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(gastoComun)}</td></tr>
+                    <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(saldoAnt)}</td></tr>
                 </table>
                 <div class="total">
-                    <div>TOTAL A PAGAR FACTURA</div>
-                    <div class="total-monto">${formatCurrency(invoice['TOTAL A PAGAR FACTURA'])}</div>
+                    <div>TOTAL A PAGAR</div>
+                    <div class="total-monto">${formatCurrency(totalFinal)}</div>
                 </div>
             </div>
         </div>
