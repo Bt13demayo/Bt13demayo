@@ -99,12 +99,6 @@
 
         if (!invoice) { resultDiv.innerHTML = 'No se encontró información.'; return; }
 
-        const subtotal = parseNumber(invoice['SUBTOTAL']);
-        const consGral = parseNumber(invoice['CONSUMO GENERAL']);
-        const gastoComun = parseNumber(invoice['GASTO COMUN']);
-        const saldoAnt = parseNumber(invoice['SALDO ANTERIOR']);
-        const totalFinal = subtotal + consGral + gastoComun + saldoAnt;
-
         resultDiv.innerHTML = `
         <div id="printArea" class="comprobante">
             <div class="header"><h3>Comprobante de Pago</h3></div>
@@ -112,19 +106,18 @@
                 <table>
                     <tr><td><strong>Casa</strong></td><td>${invoice['CASA']}</td></tr>
                     <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
-                    <tr><td><strong>Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
+                    <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
                     <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
                     <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
                     <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
                     <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
-                    <tr><td><strong>Subtotal</strong></td><td>${formatCurrency(subtotal)}</td></tr>
-                    <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(consGral)}</td></tr>
-                    <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(gastoComun)}</td></tr>
-                    <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(saldoAnt)}</td></tr>
+                    <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(invoice['CONSUMO GENERAL'])}</td></tr>
+                    <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(invoice['GASTO COMUN'])}</td></tr>
+                    <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(invoice['SALDO ANTERIOR'])}</td></tr>
                 </table>
                 <div class="total">
-                    <div>TOTAL A PAGAR</div>
-                    <div class="total-monto">${formatCurrency(totalFinal)}</div>
+                    <div>TOTAL A PAGAR FACTURA</div>
+                    <div class="total-monto">${formatCurrency(invoice['TOTAL A PAGAR FACTURA'])}</div>
                 </div>
             </div>
         </div>
