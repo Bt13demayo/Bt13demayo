@@ -14,7 +14,10 @@
         select, input, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
         button { background: #0d47a1; color: white; cursor: pointer; font-weight: bold; border: none; }
         button:hover { background: #08306b; }
+        button:disabled { background: #9fa8da; cursor: not-allowed; }
         .btn-pdf { background: #c62828; margin-top: 15px; }
+        .btn-pdf:hover { background: #b71c1c; }
+        #statusMessage { text-align: center; color: #0d47a1; font-weight: bold; margin: 5px 0; font-size: 14px; }
         #result { margin-top: 25px; }
         table { width: 100%; border-collapse: collapse; }
         td { padding: 8px; border-bottom: 1px solid #eee; }
@@ -55,9 +58,11 @@
         <option value="facturas_2024_11.xlsx">Noviembre 2024</option>
     </select>
 
+    <div id="statusMessage"></div>
+
     <label>Número de Casa:</label>
-    <input type="number" id="houseNumber" placeholder="Ej: 13">
-    <button onclick="searchInvoice()">Buscar Comprobante</button>
+    <input type="number" id="houseNumber" placeholder="Ej: 13" disabled>
+    <button id="searchBtn" onclick="searchInvoice()" disabled>Buscar Comprobante</button>
 
     <div id="result"></div>
 </div>
@@ -67,19 +72,50 @@
 
     async function loadSelectedMonth() {
         const file = document.getElementById('monthSelector').value;
-        if (!file) return;
+        const statusMessage = document.getElementById('statusMessage');
+        const houseInput = document.getElementById('houseNumber');
+        const searchBtn = document.getElementById('searchBtn');
+        const resultDiv = document.getElementById('result');
+
+        if (!file) {
+            invoices = [];
+            houseInput.disabled = true;
+            searchBtn.disabled = true;
+            statusMessage.innerText = "";
+            resultDiv.innerHTML = "";
+            return;
+        }
+
         try {
+            // UI en estado de carga
+            statusMessage.innerText = "Cargando datos del mes...";
+            houseInput.disabled = true;
+            searchBtn.disabled = true;
+            resultDiv.innerHTML = "";
+
             const response = await fetch(file);
+            if (!response.ok) throw new Error("No se pudo encontrar el archivo.");
+            
             const data = await response.arrayBuffer();
             const workbook = XLSX.read(data, {type: 'array'});
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(sheet, {defval: 0});
+            
             invoices = jsonData.map(row => {
                 const normalized = {};
                 for(const key in row) normalized[key.trim().toUpperCase()] = row[key];
                 return normalized;
             });
-        } catch(e) { alert("Error al cargar el archivo."); }
+
+            // UI lista para buscar
+            statusMessage.innerText = "¡Datos cargados con éxito!";
+            houseInput.disabled = false;
+            searchBtn.disabled = false;
+        } catch(e) { 
+            statusMessage.innerText = "";
+            alert("Error al cargar el archivo. Asegúrate de que existe en la ruta correcta."); 
+            console.error(e);
+        }
     }
 
     function parseNumber(value) {
@@ -94,12 +130,15 @@
 
     function searchInvoice() {
         const houseNumber = document.getElementById('houseNumber').value;
-        const invoice = invoices.find(row => String(row['CASA']) == String(houseNumber));
         const resultDiv = document.getElementById('result');
 
-        if (!invoice) { resultDiv.innerHTML = 'No se encontró información.'; return; }
+        if (!houseNumber) { alert("Por favor, ingresa un número de casa."); return; }
 
-        // CÁLCULO MANUAL (Ignoramos la columna final del Excel para evitar errores)
+        const invoice = invoices.find(row => String(row['CASA']) == String(houseNumber));
+
+        if (!invoice) { resultDiv.innerHTML = '<p style="color:red; text-align:center;">No se encontró información para esa casa.</p>'; return; }
+
+        // CÁLCULO MANUAL 
         const subtotalCalculado = parseNumber(invoice['CONSUMO DE AGUA M3']) * parseNumber(invoice['VALOR DE M3']);
         const gastoComun = parseNumber(invoice['GASTO COMUN']);
         const consumoGral = parseNumber(invoice['CONSUMO GENERAL']);
@@ -111,12 +150,12 @@
             <div class="header"><h3>Comprobante de Pago</h3></div>
             <div style="padding:20px;">
                 <table>
-                    <tr><td><strong>Casa</strong></td><td>${invoice['CASA']}</td></tr>
-                    <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
-                    <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
-                    <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
-                    <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
-                    <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
+                    <tr><td><strong>Casa</strong></td><td>${invoice['CASA'] || ''}</td></tr>
+                    <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA'] || 'No registrado'}</td></tr>
+                    <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR'] || 'N/A'}</td></tr>
+                    <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR'] || 0}</td></tr>
+                    <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL'] || 0}</td></tr>
+                    <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3'] || 0}</td></tr>
                     <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
                     <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(consumoGral)}</td></tr>
                     <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(gastoComun)}</td></tr>
@@ -128,20 +167,19 @@
                 </div>
             </div>
         </div>
-        <button class="btn-pdf" onclick="descargarPDF()">Descargar Comprobante PDF</button>`;
+        <button class="btn-pdf" onclick="descargarPDF(${invoice['CASA']})">Descargar Comprobante PDF</button>`;
     }
 
-    function descargarPDF() {
+    function descargarPDF(casaNum) {
         const element = document.getElementById('printArea');
-        const clone = element.cloneNode(true);
         const opt = {
             margin: 10,
-            filename: 'Comprobante_Pago.pdf',
+            filename: `Comprobante_Casa_${casaNum}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-        html2pdf().set(opt).from(clone).save();
+        html2pdf().set(opt).from(element).save();
     }
 </script>
 </body>
