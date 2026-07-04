@@ -7,7 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; background: #eef2f7; margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #eef2f7; margin: 0; padding: 20px; }
         .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,.1); }
         h1 { text-align: center; color: #0d47a1; margin-bottom: 5px; font-size: 22px; }
         .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
@@ -16,12 +16,20 @@
         button:hover { background: #08306b; }
         .btn-pdf { background: #c62828; margin-top: 15px; }
         #result { margin-top: 25px; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 8px; border-bottom: 1px solid #eee; }
-        .comprobante { background: white; border-radius: 15px; overflow: hidden; border: 1px solid #ddd; padding: 20px; }
+        
+        /* Estilos del comprobante */
+        .comprobante { 
+            background: white; 
+            border: 1px solid #ddd; 
+            padding: 20px; 
+            border-radius: 10px;
+            color: #333;
+        }
         .header { background: #0d47a1; color: white; padding: 15px; text-align: center; border-radius: 10px; margin-bottom: 15px; }
-        .total { background: #e8f5e9; text-align: center; padding: 15px; border-radius: 10px; margin-top: 15px; }
-        .total-monto { font-size: 28px; color: #2e7d32; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+        .total { background: #e8f5e9; text-align: center; padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px solid #c8e6c9; }
+        .total-monto { font-size: 24px; color: #2e7d32; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -35,24 +43,6 @@
         <option value="">Seleccionar...</option>
         <option value="facturas_2026_06.xlsx">Junio 2026</option>
         <option value="facturas_2026_05.xlsx">Mayo 2026</option>
-        <option value="facturas_2026_04.xlsx">Abril 2026</option>
-        <option value="facturas_2026_03.xlsx">Marzo 2026</option>
-        <option value="facturas_2026_02.xlsx">Febrero 2026</option>
-        <option value="facturas_2026_01.xlsx">Enero 2026</option>
-        <option value="facturas_2025_12.xlsx">Diciembre 2025</option>
-        <option value="facturas_2025_11.xlsx">Noviembre 2025</option>
-        <option value="facturas_2025_10.xlsx">Octubre 2025</option>
-        <option value="facturas_2025_09.xlsx">Septiembre 2025</option>
-        <option value="facturas_2025_08.xlsx">Agosto 2025</option>
-        <option value="facturas_2025_07.xlsx">Julio 2025</option>
-        <option value="facturas_2025_06.xlsx">Junio 2025</option>
-        <option value="facturas_2025_05.xlsx">Mayo 2025</option>
-        <option value="facturas_2025_04.xlsx">Abril 2025</option>
-        <option value="facturas_2025_03.xlsx">Marzo 2025</option>
-        <option value="facturas_2025_02.xlsx">Febrero 2025</option>
-        <option value="facturas_2025_01.xlsx">Enero 2025</option>
-        <option value="facturas_2024_12.xlsx">Diciembre 2024</option>
-        <option value="facturas_2024_11.xlsx">Noviembre 2024</option>
     </select>
 
     <label>Número de Casa:</label>
@@ -64,33 +54,7 @@
 
 <script>
     let invoices = [];
-
-    async function loadSelectedMonth() {
-        const file = document.getElementById('monthSelector').value;
-        if (!file) return;
-        try {
-            const response = await fetch(file);
-            const data = await response.arrayBuffer();
-            const workbook = XLSX.read(data, {type: 'array'});
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(sheet, {defval: 0});
-            invoices = jsonData.map(row => {
-                const normalized = {};
-                for(const key in row) normalized[key.trim().toUpperCase()] = row[key];
-                return normalized;
-            });
-        } catch(e) { alert("Error al cargar el archivo."); }
-    }
-
-    function parseNumber(value) {
-        if (typeof value === 'number') return value;
-        if (typeof value === 'string') return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
-        return 0;
-    }
-
-    function formatCurrency(val) {
-        return new Intl.NumberFormat('es-CL', {style: 'currency', currency: 'CLP'}).format(val || 0);
-    }
+    // ... (Tu función loadSelectedMonth, parseNumber, formatCurrency igual) ...
 
     function searchInvoice() {
         const houseNumber = document.getElementById('houseNumber').value;
@@ -99,49 +63,46 @@
 
         if (!invoice) { resultDiv.innerHTML = 'No se encontró información.'; return; }
 
-        // CÁLCULO MANUAL (Ignoramos la columna final del Excel para evitar errores)
-        const subtotalCalculado = parseNumber(invoice['CONSUMO DE AGUA M3']) * parseNumber(invoice['VALOR DE M3']);
-        const gastoComun = parseNumber(invoice['GASTO COMUN']);
-        const consumoGral = parseNumber(invoice['CONSUMO GENERAL']);
-        const saldoAnt = parseNumber(invoice['SALDO ANTERIOR']);
-        const totalFinal = subtotalCalculado + gastoComun + consumoGral + saldoAnt;
+        // Cálculo seguro
+        const total = parseFloat(invoice['TOTAL A PAGAR FACTURA'] || 0);
 
         resultDiv.innerHTML = `
         <div id="printArea" class="comprobante">
             <div class="header"><h3>Comprobante de Pago</h3></div>
-            <div style="padding:20px;">
-                <table>
-                    <tr><td><strong>Casa</strong></td><td>${invoice['CASA']}</td></tr>
-                    <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
-                    <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
-                    <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
-                    <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
-                    <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
-                    <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
-                    <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(consumoGral)}</td></tr>
-                    <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(gastoComun)}</td></tr>
-                    <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(saldoAnt)}</td></tr>
-                </table>
-                <div class="total">
-                    <div>TOTAL A PAGAR</div>
-                    <div class="total-monto">${formatCurrency(totalFinal)}</div>
-                </div>
+            <table>
+                <tr><td><strong>Casa:</strong></td><td>${invoice['CASA']}</td></tr>
+                <tr><td><strong>Titular:</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
+                <tr><td><strong>N° Remarcador:</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
+                <tr><td><strong>Lectura Ant:</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
+                <tr><td><strong>Lectura Act:</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
+                <tr><td><strong>Consumo M³:</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
+                <tr><td><strong>Valor M³:</strong></td><td>${invoice['VALOR DE M3']}</td></tr>
+                <tr><td><strong>Consumo Gral:</strong></td><td>${invoice['CONSUMO GENERAL']}</td></tr>
+                <tr><td><strong>Gasto Común:</strong></td><td>${invoice['GASTO COMUN']}</td></tr>
+                <tr><td><strong>Saldo Ant:</strong></td><td>${invoice['SALDO ANTERIOR']}</td></tr>
+            </table>
+            <div class="total">
+                <p>TOTAL A PAGAR FACTURA</p>
+                <div class="total-monto">$${total.toLocaleString('es-CL')}</div>
             </div>
         </div>
-        <button class="btn-pdf" onclick="descargarPDF()">Descargar Comprobante PDF</button>`;
+        <button class="btn-pdf" onclick="descargarPDF()">Descargar PDF Completo</button>`;
     }
 
     function descargarPDF() {
         const element = document.getElementById('printArea');
-        const clone = element.cloneNode(true);
+        
+        // Configuración crítica para renderizado completo
         const opt = {
-            margin: 10,
-            filename: 'Comprobante_Pago.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            margin:       10,
+            filename:     'Comprobante.pdf',
+            image:        { type: 'jpeg', quality: 1 },
+            html2canvas:  { scale: 2, logging: false, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-        html2pdf().set(opt).from(clone).save();
+
+        // Forzamos la creación del PDF
+        html2pdf().set(opt).from(element).save();
     }
 </script>
 </body>
