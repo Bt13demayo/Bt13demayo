@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barrio Transitorio 13 de Mayo</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; background: #eef2f7; margin: 0; padding: 20px; }
         .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,.1); }
@@ -13,10 +14,11 @@
         select, input, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
         button { background: #0d47a1; color: white; cursor: pointer; font-weight: bold; border: none; }
         button:hover { background: #08306b; }
+        .btn-pdf { background: #c62828; margin-top: 15px; }
         #result { margin-top: 25px; }
         table { width: 100%; border-collapse: collapse; }
-        td { padding: 10px; border-bottom: 1px solid #eee; }
-        .comprobante { background: white; border-radius: 15px; border: 1px solid #ddd; padding: 20px; width: 100%; box-sizing: border-box; }
+        td { padding: 8px; border-bottom: 1px solid #eee; }
+        .comprobante { background: white; border-radius: 15px; overflow: hidden; border: 1px solid #ddd; padding: 20px; }
         .header { background: #0d47a1; color: white; padding: 15px; text-align: center; border-radius: 10px; margin-bottom: 15px; }
         .total { background: #e8f5e9; text-align: center; padding: 15px; border-radius: 10px; margin-top: 15px; }
         .total-monto { font-size: 28px; color: #2e7d32; font-weight: bold; }
@@ -97,6 +99,7 @@
 
         if (!invoice) { resultDiv.innerHTML = 'No se encontró información.'; return; }
 
+        // CÁLCULO MANUAL (Ignoramos la columna final del Excel para evitar errores)
         const subtotalCalculado = parseNumber(invoice['CONSUMO DE AGUA M3']) * parseNumber(invoice['VALOR DE M3']);
         const gastoComun = parseNumber(invoice['GASTO COMUN']);
         const consumoGral = parseNumber(invoice['CONSUMO GENERAL']);
@@ -106,23 +109,39 @@
         resultDiv.innerHTML = `
         <div id="printArea" class="comprobante">
             <div class="header"><h3>Comprobante de Pago</h3></div>
-            <table>
-                <tr><td><strong>Casa</strong></td><td>${invoice['CASA']}</td></tr>
-                <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVILLA']}</td></tr>
-                <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
-                <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
-                <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
-                <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
-                <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
-                <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(consumoGral)}</td></tr>
-                <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(gastoComun)}</td></tr>
-                <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(saldoAnt)}</td></tr>
-            </table>
-            <div class="total">
-                <div>TOTAL A PAGAR</div>
-                <div class="total-monto">${formatCurrency(totalFinal)}</div>
+            <div style="padding:20px;">
+                <table>
+                    <tr><td><strong>Casa</strong></td><td>${invoice['CASA']}</td></tr>
+                    <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
+                    <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
+                    <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
+                    <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
+                    <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
+                    <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
+                    <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(consumoGral)}</td></tr>
+                    <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(gastoComun)}</td></tr>
+                    <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(saldoAnt)}</td></tr>
+                </table>
+                <div class="total">
+                    <div>TOTAL A PAGAR</div>
+                    <div class="total-monto">${formatCurrency(totalFinal)}</div>
+                </div>
             </div>
-        </div>`;
+        </div>
+        <button class="btn-pdf" onclick="descargarPDF()">Descargar Comprobante PDF</button>`;
+    }
+
+    function descargarPDF() {
+        const element = document.getElementById('printArea');
+        const clone = element.cloneNode(true);
+        const opt = {
+            margin: 10,
+            filename: 'Comprobante_Pago.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, logging: false },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(clone).save();
     }
 </script>
 </body>
