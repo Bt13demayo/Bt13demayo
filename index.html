@@ -87,7 +87,7 @@ td{
 <select id="monthSelector" onchange="loadSelectedMonth()">
 <option value="">Seleccionar...</option>
 <option value="facturas_2026_06.xlsx">Junio 2026</option>  
-<option value="facturas_2026_05.xlsx">Mayo 2026</option>    
+<option value="facturas_2026_05.xlsx">Mayo 2026</option>     
 <option value="facturas_2026_04.xlsx">Abril2026</option>
 <option value="facturas_2026_03.xlsx">Marzo2026</option>
 <option value="facturas_2026_02.xlsx">Febrero2026</option>
@@ -197,7 +197,6 @@ function searchInvoice(){
             <tr><td><strong>Casa</strong></td><td>${invoice['CASA']}</td></tr>
             <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
             <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
-            <tr><td><strong>Lectura Anterior</strong></td><td>${lecturaAnterior}</td></tr>
             <tr><td><strong>Lectura Actual</strong></td><td>${lecturaActual}</td></tr>
             <tr><td><strong>Consumo Agua M³</strong></td><td>${consumoAgua.toFixed(2)}</td></tr>
             <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(valorM3)}</td></tr>
@@ -215,3 +214,5 @@ function searchInvoice(){
     </div>`;
 }
 </script>
+</body>
+</html>
