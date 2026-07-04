@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barrio Transitorio 13 de Mayo</title>
-    <!-- Librerías: SheetJS para Excel y html2pdf para generar PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -57,7 +56,7 @@
     </select>
 
     <label>Número de Casa:</label>
-    <input type="number" id="houseNumber" placeholder="Ej: 101">
+    <input type="number" id="houseNumber" placeholder="Ej: 13">
     <button onclick="searchInvoice()">Buscar Comprobante</button>
 
     <div id="result"></div>
@@ -71,17 +70,22 @@
         if (!file) return;
         try {
             const response = await fetch(file);
-            if (!response.ok) throw new Error('Archivo no encontrado');
             const data = await response.arrayBuffer();
             const workbook = XLSX.read(data, {type: 'array'});
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(sheet, {defval: ""});
+            const jsonData = XLSX.utils.sheet_to_json(sheet, {defval: 0});
             invoices = jsonData.map(row => {
                 const normalized = {};
                 for(const key in row) normalized[key.trim().toUpperCase()] = row[key];
                 return normalized;
             });
-        } catch(e) { alert("Error al cargar el archivo. Asegúrate de que existe."); }
+        } catch(e) { alert("Error al cargar el archivo."); }
+    }
+
+    function parseNumber(value) {
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string') return parseFloat(value.replace(/[^0-9.-]+/g, '')) || 0;
+        return 0;
     }
 
     function formatCurrency(val) {
@@ -90,31 +94,38 @@
 
     function searchInvoice() {
         const houseNumber = document.getElementById('houseNumber').value;
-        const invoice = invoices.find(row => String(row['CASA']) === String(houseNumber));
+        const invoice = invoices.find(row => String(row['CASA']) == String(houseNumber));
         const resultDiv = document.getElementById('result');
 
-        if (!invoice) { resultDiv.innerHTML = '<p style="text-align:center; color:red;">No se encontró información para esta casa.</p>'; return; }
+        if (!invoice) { resultDiv.innerHTML = 'No se encontró información.'; return; }
+
+        const subtotal = parseNumber(invoice['SUBTOTAL']);
+        const consGral = parseNumber(invoice['CONSUMO GENERAL']);
+        const gastoComun = parseNumber(invoice['GASTO COMUN']);
+        const saldoAnt = parseNumber(invoice['SALDO ANTERIOR']);
+        const totalFinal = subtotal + consGral + gastoComun + saldoAnt;
 
         resultDiv.innerHTML = `
         <div id="printArea" class="comprobante">
             <div class="header"><h3>Comprobante de Pago</h3></div>
-            <table>
-                <tr><td><strong>Casa</strong></td><td>${invoice['CASA']}</td></tr>
-                <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
-                <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
-                <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
-                <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
-                <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
-                <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
-                <tr><td><strong>Subtotal</strong></td><td>${formatCurrency(invoice['SUBTOTAL'])}</td></tr>
-                <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(invoice['CONSUMO GENERAL'])}</td></tr>
-                <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(invoice['GASTO COMUN'])}</td></tr>
-                <tr><td><strong>Total Junio</strong></td><td>${formatCurrency(invoice['TOTAL A PAGAR JUNIO'])}</td></tr>
-                <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(invoice['SALDO ANTERIOR'])}</td></tr>
-            </table>
-            <div class="total">
-                <div>TOTAL A PAGAR</div>
-                <div class="total-monto">${formatCurrency(invoice['TOTAL A PAGAR'])}</div>
+            <div style="padding:20px;">
+                <table>
+                    <tr><td><strong>Casa</strong></td><td>${invoice['CASA']}</td></tr>
+                    <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
+                    <tr><td><strong>Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
+                    <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
+                    <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
+                    <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
+                    <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
+                    <tr><td><strong>Subtotal</strong></td><td>${formatCurrency(subtotal)}</td></tr>
+                    <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(consGral)}</td></tr>
+                    <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(gastoComun)}</td></tr>
+                    <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(saldoAnt)}</td></tr>
+                </table>
+                <div class="total">
+                    <div>TOTAL A PAGAR</div>
+                    <div class="total-monto">${formatCurrency(totalFinal)}</div>
+                </div>
             </div>
         </div>
         <button class="btn-pdf" onclick="descargarPDF()">Descargar Comprobante PDF</button>`;
@@ -122,14 +133,15 @@
 
     function descargarPDF() {
         const element = document.getElementById('printArea');
+        const clone = element.cloneNode(true);
         const opt = {
             margin: 10,
             filename: 'Comprobante_Pago.pdf',
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 },
+            html2canvas: { scale: 2, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-        html2pdf().set(opt).from(element).save();
+        html2pdf().set(opt).from(clone).save();
     }
 </script>
 </body>
