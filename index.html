@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barrio Transitorio 13 de Mayo</title>
-    <!-- Librerías necesarias -->
+    <!-- Librerías: SheetJS para Excel y html2pdf para generar PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -13,7 +13,7 @@
         h1 { text-align: center; color: #0d47a1; margin-bottom: 5px; font-size: 22px; }
         .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
         select, input, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
-        button { background: #0d47a1; color: white; cursor: pointer; font-weight: bold; }
+        button { background: #0d47a1; color: white; cursor: pointer; font-weight: bold; border: none; }
         button:hover { background: #08306b; }
         .btn-pdf { background: #c62828; margin-top: 15px; }
         #result { margin-top: 25px; }
@@ -36,6 +36,24 @@
         <option value="">Seleccionar...</option>
         <option value="facturas_2026_06.xlsx">Junio 2026</option>
         <option value="facturas_2026_05.xlsx">Mayo 2026</option>
+        <option value="facturas_2026_04.xlsx">Abril 2026</option>
+        <option value="facturas_2026_03.xlsx">Marzo 2026</option>
+        <option value="facturas_2026_02.xlsx">Febrero 2026</option>
+        <option value="facturas_2026_01.xlsx">Enero 2026</option>
+        <option value="facturas_2025_12.xlsx">Diciembre 2025</option>
+        <option value="facturas_2025_11.xlsx">Noviembre 2025</option>
+        <option value="facturas_2025_10.xlsx">Octubre 2025</option>
+        <option value="facturas_2025_09.xlsx">Septiembre 2025</option>
+        <option value="facturas_2025_08.xlsx">Agosto 2025</option>
+        <option value="facturas_2025_07.xlsx">Julio 2025</option>
+        <option value="facturas_2025_06.xlsx">Junio 2025</option>
+        <option value="facturas_2025_05.xlsx">Mayo 2025</option>
+        <option value="facturas_2025_04.xlsx">Abril 2025</option>
+        <option value="facturas_2025_03.xlsx">Marzo 2025</option>
+        <option value="facturas_2025_02.xlsx">Febrero 2025</option>
+        <option value="facturas_2025_01.xlsx">Enero 2025</option>
+        <option value="facturas_2024_12.xlsx">Diciembre 2024</option>
+        <option value="facturas_2024_11.xlsx">Noviembre 2024</option>
     </select>
 
     <label>Número de Casa:</label>
@@ -53,6 +71,7 @@
         if (!file) return;
         try {
             const response = await fetch(file);
+            if (!response.ok) throw new Error('Archivo no encontrado');
             const data = await response.arrayBuffer();
             const workbook = XLSX.read(data, {type: 'array'});
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -62,7 +81,7 @@
                 for(const key in row) normalized[key.trim().toUpperCase()] = row[key];
                 return normalized;
             });
-        } catch(e) { alert("Error al cargar el archivo. Asegúrate de que el archivo existe y el servidor está activo."); }
+        } catch(e) { alert("Error al cargar el archivo. Asegúrate de que existe."); }
     }
 
     function formatCurrency(val) {
@@ -74,7 +93,7 @@
         const invoice = invoices.find(row => String(row['CASA']) === String(houseNumber));
         const resultDiv = document.getElementById('result');
 
-        if (!invoice) { resultDiv.innerHTML = '<p style="text-align:center; color:red;">No se encontró información.</p>'; return; }
+        if (!invoice) { resultDiv.innerHTML = '<p style="text-align:center; color:red;">No se encontró información para esta casa.</p>'; return; }
 
         resultDiv.innerHTML = `
         <div id="printArea" class="comprobante">
@@ -82,7 +101,7 @@
             <table>
                 <tr><td><strong>Casa</strong></td><td>${invoice['CASA']}</td></tr>
                 <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
-                <tr><td><strong>Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
+                <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
                 <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
                 <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
                 <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
@@ -98,7 +117,7 @@
                 <div class="total-monto">${formatCurrency(invoice['TOTAL A PAGAR'])}</div>
             </div>
         </div>
-        <button class="btn-pdf" onclick="descargarPDF()">Descargar como PDF</button>`;
+        <button class="btn-pdf" onclick="descargarPDF()">Descargar Comprobante PDF</button>`;
     }
 
     function descargarPDF() {
