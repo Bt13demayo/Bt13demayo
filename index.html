@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barrio Transitorio 13 de Mayo</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; background: #eef2f7; margin: 0; padding: 20px; }
         .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,.1); }
@@ -15,8 +14,6 @@
         button { background: #0d47a1; color: white; cursor: pointer; font-weight: bold; border: none; }
         button:hover { background: #08306b; }
         button:disabled { background: #9fa8da; cursor: not-allowed; }
-        .btn-pdf { background: #c62828; margin-top: 15px; }
-        .btn-pdf:hover { background: #b71c1c; }
         #statusMessage { text-align: center; color: #0d47a1; font-weight: bold; margin: 5px 0; font-size: 14px; }
         #result { margin-top: 25px; }
         table { width: 100%; border-collapse: collapse; }
@@ -87,7 +84,6 @@
         }
 
         try {
-            // UI en estado de carga
             statusMessage.innerText = "Cargando datos del mes...";
             houseInput.disabled = true;
             searchBtn.disabled = true;
@@ -107,7 +103,6 @@
                 return normalized;
             });
 
-            // UI lista para buscar
             statusMessage.innerText = "¡Datos cargados con éxito!";
             houseInput.disabled = false;
             searchBtn.disabled = false;
@@ -138,7 +133,6 @@
 
         if (!invoice) { resultDiv.innerHTML = '<p style="color:red; text-align:center;">No se encontró información para esa casa.</p>'; return; }
 
-        // CÁLCULO MANUAL 
         const subtotalCalculado = parseNumber(invoice['CONSUMO DE AGUA M3']) * parseNumber(invoice['VALOR DE M3']);
         const gastoComun = parseNumber(invoice['GASTO COMUN']);
         const consumoGral = parseNumber(invoice['CONSUMO GENERAL']);
@@ -146,7 +140,7 @@
         const totalFinal = subtotalCalculado + gastoComun + consumoGral + saldoAnt;
 
         resultDiv.innerHTML = `
-        <div id="printArea" class="comprobante">
+        <div class="comprobante">
             <div class="header"><h3>Comprobante de Pago</h3></div>
             <div style="padding:20px;">
                 <table>
@@ -166,20 +160,7 @@
                     <div class="total-monto">${formatCurrency(totalFinal)}</div>
                 </div>
             </div>
-        </div>
-        <button class="btn-pdf" onclick="descargarPDF(${invoice['CASA']})">Descargar Comprobante PDF</button>`;
-    }
-
-    function descargarPDF(casaNum) {
-        const element = document.getElementById('printArea');
-        const opt = {
-            margin: 10,
-            filename: `Comprobante_Casa_${casaNum}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, logging: false },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-        html2pdf().set(opt).from(element).save();
+        </div>`;
     }
 </script>
 </body>
