@@ -2,55 +2,107 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Comprobante de Pago</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barrio Transitorio 13 de Mayo</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        .comprobante { background: white; padding: 20px; border: 1px solid #ddd; width: 100%; max-width: 500px; }
-        .header { background: #0d47a1; color: white; padding: 15px; text-align: center; }
-        .total-box { background: #e8f5e9; padding: 15px; text-align: center; margin-top: 10px; font-weight: bold; }
+        body { font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; background: #eef2f7; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,.1); }
+        h1 { text-align: center; color: #0d47a1; margin-bottom: 5px; font-size: 22px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
+        select, input, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { background: #0d47a1; color: white; cursor: pointer; font-weight: bold; border: none; }
+        button:hover { background: #08306b; }
+        #result { margin-top: 25px; }
+        
+        /* Estilos del comprobante */
+        .comprobante { background: white; border: 1px solid #ddd; padding: 20px; border-radius: 10px; color: #333; }
+        .header { background: #0d47a1; color: white; padding: 15px; text-align: center; border-radius: 10px; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+        .total { background: #e8f5e9; text-align: center; padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px solid #c8e6c9; }
+        .total-monto { font-size: 24px; color: #2e7d32; font-weight: bold; }
+        
+        /* Estilo para impresión */
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; border: none; }
+            button, select, input, label { display: none; }
+        }
     </style>
 </head>
 <body>
 
-<div id="result"></div>
+<div class="container">
+    <h1>Barrio Transitorio 13 de Mayo</h1>
+    <p class="subtitle">Consulta de Facturas</p>
+
+    <label>Seleccionar Mes:</label>
+    <select id="monthSelector" onchange="loadSelectedMonth()">
+        <option value="">Seleccionar...</option>
+        <option value="facturas_2026_06.xlsx">Junio 2026</option>
+        <option value="facturas_2026_05.xlsx">Mayo 2026</option>
+    </select>
+
+    <label>Número de Casa:</label>
+    <input type="number" id="houseNumber" placeholder="Ej: 72">
+    <button onclick="searchInvoice()">Buscar Comprobante</button>
+
+    <div id="result"></div>
+</div>
 
 <script>
+    let invoices = [];
+
+    async function loadSelectedMonth() {
+        const file = document.getElementById('monthSelector').value;
+        if (!file) return;
+        try {
+            const response = await fetch(file);
+            const data = await response.arrayBuffer();
+            const workbook = XLSX.read(data, {type: 'array'});
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(sheet, {defval: 0});
+            invoices = jsonData.map(row => {
+                const normalized = {};
+                for(const key in row) normalized[key.trim().toUpperCase()] = row[key];
+                return normalized;
+            });
+        } catch(e) { alert("Error al cargar el archivo."); }
+    }
+
     function searchInvoice() {
-        // ... (Tu lógica de búsqueda) ...
-        
-        // Cálculo seguro del total
+        const houseNumber = document.getElementById('houseNumber').value;
+        const invoice = invoices.find(row => String(row['CASA']) == String(houseNumber));
+        const resultDiv = document.getElementById('result');
+
+        if (!invoice) { resultDiv.innerHTML = 'No se encontró información.'; return; }
+
         const total = parseFloat(invoice['TOTAL A PAGAR FACTURA'] || 0);
 
         resultDiv.innerHTML = `
         <div id="printArea" class="comprobante">
             <div class="header"><h3>Comprobante de Pago</h3></div>
-            <p><strong>Casa:</strong> ${invoice['CASA']}</p>
-            <p><strong>Titular:</strong> ${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</p>
-            <p><strong>N° Remarcador:</strong> ${invoice['N° REMARCADOR']}</p>
-            <div class="total-box">
-                <p>TOTAL A PAGAR</p>
-                <div style="font-size: 24px;">$${total.toLocaleString('es-CL')}</div>
+            <table>
+                <tr><td><strong>Casa:</strong></td><td>${invoice['CASA']}</td></tr>
+                <tr><td><strong>Titular:</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA']}</td></tr>
+                <tr><td><strong>N° Remarcador:</strong></td><td>${invoice['N° REMARCADOR']}</td></tr>
+                <tr><td><strong>Lectura Ant:</strong></td><td>${invoice['LECTURA ANTERIOR']}</td></tr>
+                <tr><td><strong>Lectura Act:</strong></td><td>${invoice['LECTURA ACTUAL']}</td></tr>
+                <tr><td><strong>Consumo M³:</strong></td><td>${invoice['CONSUMO DE AGUA M3']}</td></tr>
+                <tr><td><strong>Valor M³:</strong></td><td>${invoice['VALOR DE M3']}</td></tr>
+                <tr><td><strong>Consumo Gral:</strong></td><td>${invoice['CONSUMO GENERAL']}</td></tr>
+                <tr><td><strong>Gasto Común:</strong></td><td>${invoice['GASTO COMUN']}</td></tr>
+                <tr><td><strong>Saldo Ant:</strong></td><td>${invoice['SALDO ANTERIOR']}</td></tr>
+            </table>
+            <div class="total">
+                <p>TOTAL A PAGAR FACTURA</p>
+                <div class="total-monto">$${total.toLocaleString('es-CL')}</div>
             </div>
         </div>
-        <button id="btnDescarga" onclick="descargarPDF()">Descargar PDF</button>`;
-    }
-
-    function descargarPDF() {
-        const btn = document.getElementById('btnDescarga');
-        btn.style.display = 'none'; // Ocultamos el botón para que no salga en el PDF
-
-        const element = document.getElementById('printArea');
-        const opt = {
-            margin: 10,
-            filename: 'Comprobante.pdf',
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        html2pdf().set(opt).from(element).save().then(() => {
-            btn.style.display = 'block'; // Volvemos a mostrar el botón tras generar
-        });
+        <p style="text-align:center; color:#666; font-size: 14px; margin-top: 20px;">
+            Presiona <strong>Ctrl + P</strong> para imprimir o guardar como PDF.
+        </p>`;
     }
 </script>
 </body>
