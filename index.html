@@ -6,22 +6,28 @@
     <title>Barrio Transitorio 13 de Mayo</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; background: #eef2f7; margin: 0; padding: 20px; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,.1); }
+        body { font-family: 'Segoe UI', Tahoma, Verdana, sans-serif; background: #eef2f7; margin: 0; padding: 10px; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,.1); box-sizing: border-box; }
         h1 { text-align: center; color: #0d47a1; margin-bottom: 5px; font-size: 22px; }
         .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
-        select, input, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+        select, input, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
         button { background: #0d47a1; color: white; cursor: pointer; font-weight: bold; border: none; }
         button:hover { background: #08306b; }
         button:disabled { background: #9fa8da; cursor: not-allowed; }
         #statusMessage { text-align: center; color: #0d47a1; font-weight: bold; margin: 5px 0; font-size: 14px; }
         #result { margin-top: 25px; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 8px; border-bottom: 1px solid #eee; }
-        .comprobante { background: white; border-radius: 15px; overflow: hidden; border: 1px solid #ddd; padding: 20px; }
+        
+        /* OPTIMIZACIÓN TABLA MÓVIL */
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        td { padding: 10px 5px; border-bottom: 1px solid #eee; font-size: 15px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+        td:first-child { width: 40%; } /* Columna etiquetas */
+        td:last-child { width: 60%; text-align: right; } /* Columna datos alineados a la derecha */
+        
+        .comprobante { background: white; border-radius: 15px; overflow: hidden; border: 1px solid #ddd; padding: 15px; box-sizing: border-box; }
         .header { background: #0d47a1; color: white; padding: 15px; text-align: center; border-radius: 10px; margin-bottom: 15px; }
+        .header h3 { margin: 0; font-size: 18px; }
         .total { background: #e8f5e9; text-align: center; padding: 15px; border-radius: 10px; margin-top: 15px; }
-        .total-monto { font-size: 28px; color: #2e7d32; font-weight: bold; }
+        .total-monto { font-size: 28px; color: #2e7d32; font-weight: bold; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -119,6 +125,11 @@
         return 0;
     }
 
+    function formatCleanDisplayNumber(value) {
+        const num = parseNumber(value);
+        return Number.isInteger(num) ? num : parseFloat(num.toFixed(2));
+    }
+
     function formatCurrency(val) {
         return new Intl.NumberFormat('es-CL', {style: 'currency', currency: 'CLP'}).format(val || 0);
     }
@@ -133,7 +144,9 @@
 
         if (!invoice) { resultDiv.innerHTML = '<p style="color:red; text-align:center;">No se encontró información para esa casa.</p>'; return; }
 
-        const subtotalCalculado = parseNumber(invoice['CONSUMO DE AGUA M3']) * parseNumber(invoice['VALOR DE M3']);
+        const consumoM3 = parseNumber(invoice['CONSUMO DE AGUA M3']);
+        const valorM3 = parseNumber(invoice['VALOR DE M3']);
+        const subtotalCalculado = consumoM3 * valorM3;
         const gastoComun = parseNumber(invoice['GASTO COMUN']);
         const consumoGral = parseNumber(invoice['CONSUMO GENERAL']);
         const saldoAnt = parseNumber(invoice['SALDO ANTERIOR']);
@@ -142,15 +155,15 @@
         resultDiv.innerHTML = `
         <div class="comprobante">
             <div class="header"><h3>Comprobante de Pago</h3></div>
-            <div style="padding:20px;">
+            <div style="padding:5px 0;">
                 <table>
                     <tr><td><strong>Casa</strong></td><td>${invoice['CASA'] || ''}</td></tr>
                     <tr><td><strong>Titular</strong></td><td>${invoice['NOMBRE DEL TITULAR DE LA VIVIENDA'] || 'No registrado'}</td></tr>
                     <tr><td><strong>N° Remarcador</strong></td><td>${invoice['N° REMARCADOR'] || 'N/A'}</td></tr>
-                    <tr><td><strong>Lectura Ant.</strong></td><td>${invoice['LECTURA ANTERIOR'] || 0}</td></tr>
-                    <tr><td><strong>Lectura Act.</strong></td><td>${invoice['LECTURA ACTUAL'] || 0}</td></tr>
-                    <tr><td><strong>Consumo M³</strong></td><td>${invoice['CONSUMO DE AGUA M3'] || 0}</td></tr>
-                    <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(invoice['VALOR DE M3'])}</td></tr>
+                    <tr><td><strong>Lectura Ant.</strong></td><td>${formatCleanDisplayNumber(invoice['LECTURA ANTERIOR'])}</td></tr>
+                    <tr><td><strong>Lectura Act.</strong></td><td>${formatCleanDisplayNumber(invoice['LECTURA ACTUAL'])}</td></tr>
+                    <tr><td><strong>Consumo M³</strong></td><td>${formatCleanDisplayNumber(consumoM3)}</td></tr>
+                    <tr><td><strong>Valor M³</strong></td><td>${formatCurrency(valorM3)}</td></tr>
                     <tr><td><strong>Consumo Gral.</strong></td><td>${formatCurrency(consumoGral)}</td></tr>
                     <tr><td><strong>Gasto Común</strong></td><td>${formatCurrency(gastoComun)}</td></tr>
                     <tr><td><strong>Saldo Ant.</strong></td><td>${formatCurrency(saldoAnt)}</td></tr>
